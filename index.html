@@ -105,15 +105,16 @@
  </main>
    <main data-view="usuarios" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
   <div class="flex flex-wrap items-center gap-2">
-   <div class="mr-auto"><h1 class="text-2xl font-bold leading-tight">Usuários</h1><p class="text-sm text-slate-500">Acessos ao sistema · guardados neste navegador</p></div>
-   <button class="btn2" onclick="uExport()">⬇ Exportar</button>
+   <div class="mr-auto"><h1 class="text-2xl font-bold leading-tight">Usuários</h1><p class="text-sm text-slate-500">Acessos ao sistema</p></div>
+   <button class="btn2" onclick="uExport()">⬇ Exportar p/ publicar</button>
    <button class="btn2" onclick="$('#uimp').click()">⬆ Importar</button><input id="uimp" type="file" accept=".json,application/json" class="hidden" onchange="uImport(this)">
    <button class="btn" onclick="uForm()">+ Novo usuário</button>
   </div>
   <div class="card p-0 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="px-3 py-2">Nome</th><th class="px-3 py-2">Usuário</th><th class="px-3 py-2">Perfil</th><th class="px-3 py-2">Status</th><th class="px-3 py-2"></th></tr></thead><tbody id="utb"></tbody></table></div>
   <p id="stw" class="hidden text-sm rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 px-3 py-2">⚠ Este navegador está bloqueando o armazenamento local: alterações de usuários e senhas valem só até fechar a página. Abra o sistema fora de modo anônimo/restrito.</p>
   <div class="card p-0 overflow-x-auto"><h2 class="font-semibold px-3 pt-3">Auditoria (últimos 15 eventos)</h2><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="px-3 py-2">Data/hora</th><th class="px-3 py-2">Usuário</th><th class="px-3 py-2">Evento</th></tr></thead><tbody id="ulog"></tbody></table></div>
-  <p class="text-xs text-slate-500">Os usuários ficam no navegador deste computador. Para levá-los a outra máquina, use Exportar e depois Importar. O arquivo exportado contém as senhas já em hash (nunca em texto puro), mas trate-o como confidencial.</p>
+  <div class="card text-sm space-y-2"><p class="font-semibold">Usuários em vários computadores (GitHub Pages)</p><p id="usync"></p>
+   <ol class="list-decimal pl-5 text-slate-500 space-y-1"><li>Crie ou altere usuários e senhas aqui (ao criar, deixe desmarcada a troca de senha no 1º acesso, para a senha definitiva valer em todos).</li><li>Clique em <b>Exportar p/ publicar</b>: será baixado o arquivo <b>usuarios.json</b>.</li><li>No repositório do GitHub, envie esse arquivo substituindo o <b>usuarios.json</b> existente (Add file → Upload files → Commit).</li><li>Em 1 a 2 minutos todos os navegadores passam a usar a nova lista. Trate o arquivo como confidencial: ele contém as senhas apenas em hash.</li></ol></div>
  </main>
   </div>
  </div>
@@ -315,7 +316,7 @@ function termoGerar(x,o){if(ROLE!='admin')return;
 </script>
 <script>
 /* Usuários e autenticação local (controle no navegador — não substitui segurança de servidor) */
-const UKEY='csd_usuarios_v3',LKEY='csd_auditoria_v3',IDLE=30*60e3,LRX=/^[a-z0-9._-]{3,30}$/,
+const RKEY='csd_remoto_v1',UKEY='csd_usuarios_v3',LKEY='csd_auditoria_v3',IDLE=30*60e3,LRX=/^[a-z0-9._-]{3,30}$/,
  SEED=[{"l": "admin", "n": "Administrador", "r": "admin", "a": 1, "s": "6402799bedc3e1b27809443be6dc772c", "h": "eb17e4d2efdda8df4f5d09874c5ebdf47246a0f84e1239d1b5f1e852c1b96311", "mc": 0, "c": "2026-10-05T00:00:00.000Z"}, {"l": "visualizador", "n": "Visualizador", "r": "viewer", "a": 1, "s": "daaf206fedf162bf754c55f3217d38af", "h": "bd5ff164ba37ac5ff2a30143e46034960f215eef37b7a4139d55bd43d43152b5", "mc": 0, "c": "2026-10-05T00:00:00.000Z"}],
  esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
  rnd=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join(''),
@@ -338,22 +339,22 @@ function hp(pw,salt){let h=sha256(salt+':'+pw);for(let i=0;i<2000;i++)h=sha256(h
 const KV=(()=>{let ok=true;const mem={};try{localStorage.setItem('_t','1');localStorage.removeItem('_t')}catch(e){ok=false}
  return{get ok(){return ok},get:k=>{try{if(ok)return localStorage.getItem(k)}catch(e){ok=false}return mem[k]==null?null:mem[k]},
   set:(k,v)=>{mem[k]=v;try{if(ok)localStorage.setItem(k,v)}catch(e){ok=false}}}})();
-let US=[],ME='',AUD=[],FAIL={n:0,until:0};
+let US=[],ME='',AUD=[],FAIL={n:0,until:0},DIRTY=0,SYNC={ok:0};
 const clone=o=>JSON.parse(JSON.stringify(o)),admins=()=>US.filter(x=>x.r=='admin'&&x.a).length;
-function uSave(){KV.set(UKEY,JSON.stringify(US));const w=$('#stw');if(w)w.classList.toggle('hidden',KV.ok)}
+function uSave(l){KV.set(UKEY,JSON.stringify(US));if(!l)DIRTY=1;const w=$('#stw');if(w)w.classList.toggle('hidden',KV.ok)}
 function uLog(e,w){AUD.unshift({t:new Date().toISOString(),u:w||ME||'-',e});AUD=AUD.slice(0,50);KV.set(LKEY,JSON.stringify(AUD))}
 function uMk(l,n,r,pw,mc){const s=rnd();return{l,n,r,a:1,s,h:hp(pw,s),mc:mc?1:0,c:new Date().toISOString()}}
 function uLoad(){let a;try{a=JSON.parse(KV.get(UKEY))}catch(e){}
  US=Array.isArray(a)&&a.length&&a.every(x=>x&&LRX.test(x.l)&&x.s&&x.h)?a:clone(SEED);
  if(!admins()){US=US.filter(x=>x.l!='admin');US.unshift(clone(SEED[0]))} /* nunca fica sem administrador */
- try{AUD=JSON.parse(KV.get(LKEY))||[]}catch(e){AUD=[]}uSave()}
+ try{AUD=JSON.parse(KV.get(LKEY))||[]}catch(e){AUD=[]}uSave(1)}
 /* Janelas internas (alert/confirm podem ser bloqueados pelo navegador) */
 function mo(h){$('#mdb').innerHTML=h;$('#md').classList.remove('hidden')}
 function closeMd(){$('#md').classList.add('hidden')}
 let _yes=null;
 function dlg(t,x,fn){_yes=fn;mo(`<h2 class="text-lg font-bold mb-2">${t}</h2><p class="text-sm text-slate-500 mb-4">${x}</p><div class="flex justify-end gap-2">${fn?'<button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="closeMd();_yes()">Confirmar</button>':'<button class="btn" onclick="closeMd()">OK</button>'}</div>`)}
 const merr=m=>{const e=$('#me');e.textContent=m;e.classList.remove('hidden')},lbl=t=>`<label class="block text-sm mb-1">${t}</label>`;
-function uRender(){const b='btn2 !py-1 !text-xs',w=$('#stw');if(w)w.classList.toggle('hidden',KV.ok);
+function uRender(){const sy=$('#usync');if(sy)sy.innerHTML=(SYNC.ok?`<span class="text-emerald-600 dark:text-emerald-400">● Base compartilhada carregada</span> (publicada em ${SYNC.pub?new Date(SYNC.pub).toLocaleString('pt-BR'):'—'})`:'<span class="text-amber-500">● usuarios.json não encontrado no site — usando apenas os usuários deste navegador</span>')+(DIRTY?'<br><b class="text-amber-500">Há alterações ainda não publicadas:</b> clique em Exportar e envie o usuarios.json ao GitHub.':'');const b='btn2 !py-1 !text-xs',w=$('#stw');if(w)w.classList.toggle('hidden',KV.ok);
  $('#utb').innerHTML=US.map(u=>{const me=u.l==ME;
   return `<tr class="border-t border-slate-200 dark:border-slate-800"><td class="px-3 py-2 font-medium">${esc(u.n)}${me?' <span class="text-xs text-slate-500">(você)</span>':''}</td><td class="px-3 py-2">${esc(u.l)}</td><td class="px-3 py-2">${u.r=='admin'?'Administrador':'Visualizador'}</td>
   <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs ${u.a?'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400':'bg-slate-500/20 text-slate-500'}">${u.a?'Ativo':'Desativado'}</span>${u.mc?' <span class="text-xs text-amber-500">troca de senha pendente</span>':''}</td>
@@ -364,7 +365,7 @@ function uForm(l){const u=US.find(x=>x.l==l),nw=!u,me=u&&u.l==ME;
  ${lbl('Nome')}<input id="uf-n" class="inp w-full mb-3" value="${esc(u?u.n:'')}">
  ${lbl('Usuário (login)')}<input id="uf-l" class="inp w-full mb-3" value="${esc(u?u.l:'')}" placeholder="ex.: maria.silva" ${nw?'':'disabled'}>
  ${lbl('Perfil')}<select id="uf-r" class="inp w-full mb-3" ${me?'disabled':''}><option value="viewer" ${u&&u.r=='viewer'?'selected':''}>Visualizador (só consulta e exporta)</option><option value="admin" ${u&&u.r=='admin'?'selected':''}>Administrador (tudo, inclusive usuários)</option></select>
- ${nw?`${lbl('Senha inicial (mín. 8, com letras e números)')}<input id="uf-p" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox" checked> Exigir troca de senha no primeiro acesso</label>`:''}
+ ${nw?`${lbl('Senha inicial (mín. 8, com letras e números)')}<input id="uf-p" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox"> Exigir troca de senha no primeiro acesso</label>`:''}
  <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
  <div class="flex justify-end gap-2"><button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="uSaveForm('${nw?'':u.l}')">Salvar</button></div>`)}
 function uSaveForm(l0){const n=$('#uf-n').value.trim(),r=$('#uf-r').value;if(!n)return merr('Informe o nome.');
@@ -377,7 +378,7 @@ function uSaveForm(l0){const n=$('#uf-n').value.trim(),r=$('#uf-r').value;if(!n)
   US.push(uMk(l,n,r,pw,$('#uf-m').checked));uLog('criou '+l)}
  uSave();closeMd();uRender()}
 function uReset(l){mo(`<h2 class="text-lg font-bold mb-1">Redefinir senha</h2><p class="text-sm text-slate-500 mb-4">Usuário: ${esc(l)}</p>
- ${lbl('Nova senha (mín. 8, com letras e números)')}<input id="uf-p" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox" checked> Exigir troca de senha no próximo acesso</label>
+ ${lbl('Nova senha (mín. 8, com letras e números)')}<input id="uf-p" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox"> Exigir troca de senha no próximo acesso</label>
  <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
  <div class="flex justify-end gap-2"><button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="uDoReset('${l}')">Salvar</button></div>`)}
 function uDoReset(l){const pw=$('#uf-p').value;if(!pwOk(pw))return merr(PWMSG);
@@ -386,7 +387,7 @@ function uToggle(l){const u=US.find(x=>x.l==l);if(l==ME)return;if(u.a&&u.r=='adm
  u.a=u.a?0:1;uLog((u.a?'ativou ':'desativou ')+l);uSave();uRender()}
 function uDel(l){const u=US.find(x=>x.l==l);if(l==ME||!u)return;if(u.a&&u.r=='admin'&&admins()<2)return dlg('Não permitido','É preciso manter ao menos um administrador ativo.');
  dlg('Excluir usuário','Excluir "'+esc(l)+'"? Esta ação não pode ser desfeita.',()=>{US=US.filter(x=>x.l!=l);uLog('excluiu '+l);uSave();uRender()})}
-function pwModal(u,forced){mo(`<h2 class="text-lg font-bold mb-1">${forced?'Defina uma nova senha':'Alterar minha senha'}</h2>${forced?'<p class="text-sm text-slate-500 mb-4">Por segurança, troque a senha provisória para continuar.</p>':'<div class="mb-4"></div>'}
+function pwModal(u,forced){mo(`<h2 class="text-lg font-bold mb-1">${forced?'Defina uma nova senha':'Alterar minha senha'}</h2>${forced?'<p class="text-sm text-slate-500 mb-4">Por segurança, troque a senha provisória para continuar.</p>':'<p class="text-sm text-slate-500 mb-4">Atenção: a nova senha vale só neste navegador. Para valer em todos os computadores, peça ao administrador para redefinir a senha e publicar o usuarios.json.</p>'}
  ${forced?'':lbl('Senha atual')+'<input id="pw0" type="password" class="inp w-full mb-3">'}
  ${lbl('Nova senha (mín. 8, com letras e números)')}<input id="pw1" type="password" class="inp w-full mb-3">${lbl('Repita a nova senha')}<input id="pw2" type="password" class="inp w-full mb-3">
  <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
@@ -397,7 +398,7 @@ function pwSave(l,forced){const u=US.find(x=>x.l==l),a=$('#pw1').value;
  if(a!==$('#pw2').value)return merr('As senhas não conferem.');
  if(hp(a,u.s)===u.h)return merr('Escolha uma senha diferente da atual.');
  u.s=rnd();u.h=hp(a,u.s);u.mc=0;uLog('alterou a própria senha',l);uSave();closeMd();if(forced)start(l)}
-function uExport(){saveAs('usuarios_csd_'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({app:'csd-usuarios',v:2,exportado:new Date().toISOString(),usuarios:US},null,1))}
+function uExport(){saveAs('usuarios.json',JSON.stringify({app:'csd-usuarios',v:3,publicado:new Date().toISOString(),usuarios:US},null,1));DIRTY=0;uRender()}
 function uImport(inp){const fl=inp.files[0];inp.value='';if(!fl)return;const rd=new FileReader();
  rd.onload=()=>{let arr;try{const j=JSON.parse(rd.result);arr=Array.isArray(j)?j:j.usuarios;if(!Array.isArray(arr))throw 0}catch(e){return dlg('Arquivo inválido','Use um arquivo gerado por "Exportar".')}
   dlg('Importar usuários','Importar '+arr.length+' registro(s)? Novos são adicionados e os de mesmo login são atualizados. Seu próprio usuário não é alterado.',()=>{
@@ -405,6 +406,14 @@ function uImport(inp){const fl=inp.files[0];inp.value='';if(!fl)return;const rd=
     const o={l:x.l,n:String(x.n),r:x.r,a:x.a?1:0,s:String(x.s),h:String(x.h),mc:x.mc?1:0,c:x.c||new Date().toISOString()},i=US.findIndex(u=>u.l==x.l);
     if(i<0){US.push(o);ad++}else{US[i]=o;at++}});
    uLog('importou usuários');uSave();uRender();dlg('Importação concluída',ad+' adicionado(s), '+at+' atualizado(s), '+ig+' ignorado(s).')})};rd.readAsText(fl)}
+/* Base compartilhada: o arquivo usuarios.json publicado junto do site vale em todos os navegadores.
+   Quando o administrador publica uma versão nova (campo "publicado" diferente), ela substitui a lista local. */
+async function uSync(){let j,a;try{const r=await fetch('usuarios.json?_='+Date.now(),{cache:'no-store'});if(!r.ok)throw 0;j=await r.json();a=Array.isArray(j)?j:j.usuarios;if(!Array.isArray(a))throw 0}catch(e){SYNC={ok:0};return}
+ a=a.filter(x=>x&&LRX.test(x.l)&&x.n&&['admin','viewer'].includes(x.r)&&x.s&&x.h).map(x=>({l:x.l,n:String(x.n),r:x.r,a:x.a?1:0,s:String(x.s),h:String(x.h),mc:x.mc?1:0,c:x.c||new Date().toISOString()}));
+ if(!a.some(x=>x.r=='admin'&&x.a)){SYNC={ok:0};return}
+ const pub=j.publicado||'v1';SYNC={ok:1,pub:j.publicado||''};
+ if(KV.get(RKEY)!==pub){US=a;KV.set(RKEY,pub);uSave(1);DIRTY=0}}
+async function uBoot(){uLoad();await uSync()}
 
 </script>
 <script>
@@ -495,7 +504,7 @@ function setTheme(dk){document.documentElement.classList.toggle('dark',dk);try{l
  Chart.defaults.color=dk?'#94a3b8':'#475569';Chart.defaults.borderColor=dk?'#1e293b':'#e2e8f0';if(D.length&&!$('#app').classList.contains('hidden'))render()}
 function start(u){const a=US.find(x=>x.l==u);ME=u;ROLE=a.r;document.body.classList.toggle('viewer',ROLE!='admin');$('#who').textContent=u+' ('+(ROLE=='admin'?'administrador':'visualizador')+')';
  $('#lg').classList.add('hidden');$('#app').classList.remove('hidden');go('fundo');idle();if(!D.length)seed();else render()}
-function login(){const l=$('#u').value.trim().toLowerCase(),e=$('#err'),now=Date.now(),bad=t=>{e.textContent=t;e.classList.remove('hidden')};
+let UREADY;async function login(){await UREADY;const l=$('#u').value.trim().toLowerCase(),e=$('#err'),now=Date.now(),bad=t=>{e.textContent=t;e.classList.remove('hidden')};
  if(FAIL.until>now)return bad('Muitas tentativas. Aguarde '+Math.ceil((FAIL.until-now)/1000)+'s.');
  const a=US.find(x=>x.l==l);
  if(a&&hp($('#pw').value,a.s)===a.h){if(!a.a)return bad('Usuário desativado. Fale com o administrador.');
@@ -506,7 +515,7 @@ let _t;function idle(){clearTimeout(_t);_t=setTimeout(()=>{uLog('sessão expirad
 function logout(){try{sessionStorage.removeItem('u')}catch(e){}location.reload()}
 function seed(){setData([norm({d:'2026-09-30',ded:4864267,base:7296400.52,aliq:.05,iss:364820.03,inss:468185.69,bruto:12160667.52,ret:833005.72,liq:11327661.8,adi:2432183.5})])}
 let dk=true;try{dk=localStorage.th!=='0'}catch(e){}setTheme(dk);
-uLoad();try{const a=US.find(x=>x.l==sessionStorage.u);if(a&&a.a&&!a.mc)start(a.l)}catch(e){}
+UREADY=uBoot();UREADY.then(()=>{try{const a=US.find(x=>x.l==sessionStorage.u);if(a&&a.a&&!a.mc)start(a.l)}catch(e){}});
 
 </script>
 
