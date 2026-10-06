@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestão Financeira CSD</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class'}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style type="text/tailwindcss">
+.card{@apply rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-4}
+.btn{@apply px-3 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition whitespace-nowrap}
+.btn2{@apply px-3 py-2 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition whitespace-nowrap}
+.inp{@apply px-3 py-2 rounded-lg text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500}
+.viewer .adm{display:none!important}
+</style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen">
+
+<!-- LOGIN -->
+<div id="lg" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-indigo-600/20 via-transparent to-emerald-500/20">
+ <div class="card w-full max-w-sm p-8">
+  <div class="text-center mb-6"><div class="inline-block bg-white rounded-xl px-4 py-3 mb-3 ring-1 ring-slate-200"><img class="logo h-16 mx-auto" alt="Consórcio Santa Dulce"></div><h1 class="text-xl font-bold">Gestão Financeira CSD</h1><p class="text-sm text-slate-500">Acesse com seu usuário e senha</p></div>
+  <input id="u" class="inp w-full mb-3" placeholder="Usuário" autocomplete="username">
+  <input id="pw" type="password" class="inp w-full mb-3" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key=='Enter')login()">
+  <p id="err" class="hidden text-sm text-rose-500 mb-3">Usuário ou senha inválidos.</p>
+  <button class="btn w-full" onclick="login()">Entrar</button>
+  <button class="text-xs text-slate-500 mt-4 w-full" onclick="setTheme(!document.documentElement.classList.contains('dark'))">Alternar modo claro/escuro</button>
+ </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+ <div class="lg:flex min-h-screen">
+  <div id="bd" class="hidden fixed inset-0 bg-black/50 z-30 lg:hidden" onclick="sb(0)"></div>
+  <aside id="sb" class="fixed inset-y-0 left-0 z-40 w-64 shrink-0 -translate-x-full lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen transition-transform bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
+   <div class="p-4 flex items-center gap-3 border-b border-slate-200 dark:border-slate-800">
+    <div class="bg-white rounded-lg px-2 py-1 ring-1 ring-slate-200"><img class="logo h-8" alt="CSD"></div>
+    <h1 class="font-bold text-sm leading-tight">Gestão Financeira CSD</h1>
+   </div>
+   <nav id="nav" class="p-3 space-y-1 flex-1 overflow-y-auto"></nav>
+   <div class="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+    <p id="who" class="text-xs text-slate-500 truncate"></p>
+    <div class="flex gap-2"><button class="btn2 flex-1" onclick="setTheme(!document.documentElement.classList.contains('dark'))">🌓 Tema</button><button class="btn2 flex-1" onclick="pwModal(0)">🔑 Senha</button><button class="btn2 flex-1" onclick="logout()">Sair</button></div>
+   </div>
+  </aside>
+  <div class="flex-1 min-w-0">
+   <div class="lg:hidden sticky top-0 z-20 flex items-center gap-3 px-4 py-3 bg-white/90 dark:bg-slate-950/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+    <button class="btn2" onclick="sb(1)">☰</button><span id="pt2" class="font-semibold"></span>
+   </div>
+   <main data-view="fundo" class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <div class="flex flex-wrap items-center gap-2">
+   <div class="mr-auto"><h1 class="text-2xl font-bold leading-tight">Fundo de Reserva</h1><p class="text-sm text-slate-500">Apuração da transferência · 1% do Faturamento Líquido</p></div>
+   <label class="text-xs text-slate-500">Data_Base
+    <select id="sel" class="inp ml-1" onchange="sel=this.value;pg=1;render()"></select></label>
+   <button class="btn2 adm" onclick="$('#fi').click()">⬆ Upload</button>
+   <input id="fi" type="file" accept=".xlsx,.xls,.csv" class="hidden">
+   <button class="btn2" onclick="xl()">Excel</button>
+   <button class="btn2" onclick="pdf()">PDF</button>
+   <button class="btn adm" onclick="termo()">📝 Termo p/ assinatura</button>
+  </div>
+  <div id="toast" class="hidden text-sm rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-2"></div>
+  <p id="per" class="text-sm text-slate-500"></p>
+  <section id="kpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></section>
+
+  <section class="grid lg:grid-cols-3 gap-4">
+   <div class="card lg:col-span-2"><h2 id="t1" class="font-semibold mb-3">Evolução por Data_Base</h2><div class="relative h-80"><canvas id="c1"></canvas></div></div>
+   <div class="card"><h2 class="font-semibold mb-3">Impostos por tributo</h2><div class="relative h-48"><canvas id="c2"></canvas></div><div id="r1" class="mt-4"></div></div>
+  </section>
+
+  <section class="card"><h2 class="font-semibold mb-3">Comparativo por período</h2><div id="cmp" class="overflow-x-auto"></div></section>
+
+  <section class="card">
+   <h2 class="font-semibold mb-3">Detalhamento</h2>
+   <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+    <input id="q" class="inp col-span-2" placeholder="🔍 Busca rápida..." oninput="pg=1;T()">
+    <input id="d1" type="date" class="inp" title="De" oninput="pg=1;T()">
+    <input id="d2" type="date" class="inp" title="Até" oninput="pg=1;T()">
+   </div>
+   <div class="overflow-x-auto"><table class="w-full text-sm"><thead id="th" class="text-xs uppercase text-slate-500 text-left"></thead><tbody id="tb"></tbody></table></div>
+   <div class="flex flex-wrap items-center justify-between gap-2 mt-3 text-sm">
+    <span id="cnt" class="text-slate-500"></span>
+    <div class="flex items-center gap-2">
+     <button class="btn2" onclick="['q','d1','d2'].forEach(i=>$('#'+i).value='');pg=1;T()">Limpar</button>
+     <select id="ps" class="inp" onchange="pg=1;T()"><option>5</option><option selected>10</option><option>25</option><option>50</option></select>
+     <button class="btn2" onclick="pg--;T()">‹</button><span id="pgi"></span><button class="btn2" onclick="pg++;T()">›</button>
+    </div>
+   </div>
+  </section>
+ </main>
+   <main data-view="reidi" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <div><h1 class="text-2xl font-bold leading-tight">REIDI</h1></div>
+  <div class="card py-16 text-center"><div class="text-5xl mb-3">🚧</div><p class="text-xl font-semibold">Em Desenvolvimento</p><p class="text-sm text-slate-500 mt-1">Este módulo ainda está sendo construído.</p></div>
+ </main>
+   <main data-view="fluxo" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <div><h1 class="text-2xl font-bold leading-tight">Fluxo de Caixa</h1></div>
+  <div class="card py-16 text-center"><div class="text-5xl mb-3">🚧</div><p class="text-xl font-semibold">Em Desenvolvimento</p><p class="text-sm text-slate-500 mt-1">Este módulo ainda está sendo construído.</p></div>
+ </main>
+   <main data-view="boletim" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <div><h1 class="text-2xl font-bold leading-tight">Boletim de Caixa</h1></div>
+  <div class="card py-16 text-center"><div class="text-5xl mb-3">🚧</div><p class="text-xl font-semibold">Em Desenvolvimento</p><p class="text-sm text-slate-500 mt-1">Este módulo ainda está sendo construído.</p></div>
+ </main>
+   <main data-view="dash" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6"></main>
+   <main data-view="usuarios" class="hidden max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <div class="flex flex-wrap items-center gap-2">
+   <div class="mr-auto"><h1 class="text-2xl font-bold leading-tight">Usuários</h1><p class="text-sm text-slate-500">Acessos ao sistema</p></div>
+   <button class="btn" onclick="uForm()">+ Novo usuário</button>
+  </div>
+  <div class="card p-0 overflow-x-auto"><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="px-3 py-2">Nome</th><th class="px-3 py-2">Usuário</th><th class="px-3 py-2">Perfil</th><th class="px-3 py-2">Status</th><th class="px-3 py-2"></th></tr></thead><tbody id="utb"></tbody></table></div>
+  <div class="card p-0 overflow-x-auto"><h2 class="font-semibold px-3 pt-3">Auditoria (últimos 15 eventos)</h2><table class="w-full text-sm"><thead class="text-left text-slate-500"><tr><th class="px-3 py-2">Data/hora</th><th class="px-3 py-2">Usuário</th><th class="px-3 py-2">Evento</th></tr></thead><tbody id="ulog"></tbody></table></div>
+  <p id="uerr" class="hidden text-sm text-rose-500"></p>
+ </main>
+  </div>
+ </div>
+</div>
+<div id="md" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"><div id="mdb" class="card w-full max-w-md p-6"></div></div>
+
+<script>
+/* Logo do consórcio embutida (base64) e proporção */
+const LOGO='data:image/png;base64,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',LR=231/90;
+
+</script>
+<script>
+/* Base do sistema: logo, registro de plugins e utilitários usados por todos os módulos
+   ($ seletor · f moeda · p percentual · br data dd/mm/aaaa · N texto sem acento) */
+document.querySelectorAll('.logo').forEach(i=>i.src=LOGO);
+Chart.register(ChartDataLabels);
+const $=s=>document.querySelector(s),
+ f=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),
+ p=n=>((+n||0)*100).toFixed(2).replace('.',',')+'%',
+ br=i=>String(i).split('-').reverse().join('/'),
+ N=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+let ROLE='viewer'; // perfil do usuário logado ('admin' ou 'viewer'), definido em start()
+/* Salva arquivos gerados: na página publicada usa a capacidade "downloads" (pede confirmação); fora dela, baixa direto */
+async function saveAs(n,data){try{const dl=await claude.use("downloads");if(dl){await dl.save({filename:n,data});return}}catch(e){if(e&&e.code=="declined")return}
+ const b=data instanceof Blob?data:new Blob([data]),x=document.createElement("a");x.href=URL.createObjectURL(b);x.download=n;x.click();setTimeout(()=>URL.revokeObjectURL(x.href),1500)}
+
+</script>
+<script>
+/* Configuração PÚBLICA do Supabase. Aqui vai somente a URL e a chave pública (anon/publishable).
+   NUNCA coloque a service_role neste arquivo, no GitHub ou em qualquer arquivo público. */
+window.CSD={
+ URL:'https://louhwynztrwglahiaoim.supabase.co',
+ KEY:'sb_publishable_3ZqvEySXP6Dt3iFCZ-hnXg_S2I7K9Dq',   // Supabase → Project Settings → API → anon / publishable key
+ DOMAIN:'consorciosantadulce.com.br'                 // mesmo valor do secret EMAIL_DOMAIN da Edge Function
+};
+
+</script>
+<script>
+/* Cliente Supabase único do sistema + chamada à Edge Function administrativa */
+const CFG=window.CSD||{},
+ SB_OK=!!(CFG.URL&&CFG.KEY&&!/COLE_AQUI/.test(CFG.KEY)&&window.supabase),
+ sb_=SB_OK?window.supabase.createClient(CFG.URL,CFG.KEY,{auth:{persistSession:true,autoRefreshToken:true}}):null,
+ emailDe=l=>l.includes('@')?l:l+'@'+CFG.DOMAIN;
+async function adminUsuarios(payload){
+ const{data,error}=await sb_.auth.getSession();if(error||!data.session)throw new Error('Sessão expirada. Faça login novamente.');
+ const r=await fetch(CFG.URL+'/functions/v1/admin-usuarios',{method:'POST',headers:{'Content-Type':'application/json',apikey:CFG.KEY,Authorization:'Bearer '+data.session.access_token},body:JSON.stringify(payload)}),
+  j=await r.json().catch(()=>({}));
+ if(!r.ok)throw new Error(j.error||'Não foi possível concluir a operação.');return j}
+
+</script>
+<script>
+/* Módulo Fundo de Reserva: leitura da planilha, cálculos (1% do Faturamento Líquido), dashboard,
+   exportações Excel/PDF e Termo de Responsáveis (PDF para assinatura).
+   Depende de js/core/app.js (utilitários) e é carregado antes de js/core/main.js. */
+let FR=.01;const TD={orig:'SANTANDER, Ag. 3324 - CC 130105657',dest:'SANTANDER, Ag. 3324 - CC 130105877',data:'',prev:'',base:''},
+ EMP=['BELOV OBRAS PORTUÁRIAS LTDA','CTC INFRA & CONSTRUCOES LTDA','CARIOCA CHRISTIANI-NIELSEN ENGENHARIA S.A'],TXK=['iss','inss','pis','cof','ir','cs','out'],
+ TX={iss:'ISS',inss:'INSS',pis:'PIS',cof:'COFINS',ir:'IR',cs:'Contribuições Sociais',out:'Outras Retenções'},
+ K=['bruto','ded','base','ret','liq','adi','sal','fr'],
+ L={bruto:'Valor Bruto da NF',ded:'Deduções',base:'Base de Cálculo',ret:'Impostos',liq:'Faturamento Líquido (de Impostos)',adi:'(-) Desconto Adiantamento',sal:'Saldo a Receber do Cliente',fr:'Fundo de Reserva'},
+ MAP=[['adi','deducao do adiantamento'],['sal','saldo a receber'],['ded','deducoes'],['base','base de calculo'],['aliq','aliquota'],['iss','iss'],['cns','nota salvada'],['inss','inss'],['pis','pis'],['cof','cofins'],['ir','valor ir'],['cs','contribuicoes'],['out','outras'],['liq','valor liquido']],
+ C=[['d','Data_Base'],['bruto','Valor Bruto'],['ded','Deduções'],['base','Base Cálc.'],['aliq','Alíq.'],['iss','ISS'],['inss','INSS'],['pis','PIS'],['cof','COFINS'],['ir','IR'],['cs','Contrib. Soc.'],['out','Outras'],['ret','Impostos'],['liq','Líquido'],['adi','(-) Desc. Adiantamento'],['sal','Saldo a Receber do Cliente'],['fr','Fundo de Reserva']],
+ P=['#6366f1','#10b981','#f59e0b','#ef4444','#06b6d4','#a855f7','#ec4899'];
+let D=[],sel='',pg=1,sk='d',sd=1,DOC='',
+ RESP=[{papel:'Elaboração',nome:'Financeiro do Consórcio'},{papel:'Conferência',nome:'Gerente Administrativo Financeiro (GAF)'},{papel:'Atesto da Diretoria',nome:'Diretor Belov'},{papel:'Atesto da Diretoria',nome:'Diretor Carioca'},{papel:'Atesto da Diretoria',nome:'Diretor CTC'}];
+
+/* ---------- Dados ---------- */
+function norm(o){TXK.forEach(k=>o[k]=+o[k]||0);o.ded=+o.ded||0;o.base=+o.base||0;o.aliq=+o.aliq||0;o.cns=+o.cns||0;
+ o.ret=+o.ret||TXK.reduce((a,k)=>a+o[k],0);o.bruto=+o.bruto||o.ded+o.base;o.liq=+o.liq||o.bruto-o.ret;
+ o.adi=+o.adi||0;o.sal=+o.sal||o.liq-o.adi;o.fr=o.liq*FR;return o}
+function toIso(v){if(v instanceof Date)return v.toISOString().slice(0,10);if(typeof v=='number')return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+ v=String(v).trim();const m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})/);return m?`${m[3]}-${m[2]}-${m[1]}`:v.slice(0,10)}
+function parse(wb){
+ DOC='';const s1=wb.SheetNames.find(x=>N(x).includes('fatur'))||wb.SheetNames[0],S2={},DX=/^\d{3}-\d{4}$/,
+  rd=n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''});
+ const rows=XLSX.utils.sheet_to_json(wb.Sheets[s1],{raw:true,defval:0}),out=[];
+ rows.forEach(r=>{const o={};for(const h in r){const k=N(h);if(k.includes('data'))o.d=toIso(r[h]);else{const m=MAP.find(a=>k.includes(a[1]));if(m)o[m[0]]=+r[h]||0}}if(o.d)out.push(o)});
+ /* aba "NNN-AAAA_Memória" (ou "Recebimento e Reserva"): impostos, desconto do adiantamento, nº do documento e taxa do fundo */
+ const n2=wb.SheetNames.find(x=>N(x).includes('memoria')&&!DX.test(x.trim()))||wb.SheetNames.find(x=>N(x).includes('recebimento')),nd=wb.SheetNames.find(x=>DX.test(x.trim()));
+ if(n2){const a=rd(n2),hi=a.findIndex(r=>r.some(c=>N(c)=='data base')&&r.some(c=>N(c).includes('valor bruto')));
+  if(hi>=0){const H=a[hi].map(N),ix=(...t)=>{for(const k of t){const i=H.findIndex(h=>h.includes(k));if(i>=0)return i}return -1},di=H.indexOf('data base'),c={bruto:ix('valor bruto'),ret:ix('impostos','retencoes e tributos'),adi:ix('desconto adiantamento','adiantado','adiantamento')};
+   for(let i=hi+1;i<a.length&&a[i][di]!==''&&N(a[i][di])!='total';i++){const d=toIso(a[i][di]);S2[d]={};for(const k in c)S2[d][k]=c[k]<0?0:+a[i][c[k]]||0}}
+  const dr=a.find(r=>N(r[0]).startsWith('documento'));if(dr&&dr[1])DOC=String(dr[1]);
+  const tr=a.find(r=>r.some(c=>N(c).startsWith('apuracao do fundo'))),tx=tr&&tr.find(c=>typeof c=='number'&&c>0&&c<1);if(tx)FR=tx}
+ /* aba "NNN-AAAA" (solicitação): data, data prevista e contas bancárias — valem como padrão do 1º período */
+ if(nd){const a=rd(nd),g=t=>{const r=a.find(r=>r.some(c=>N(c).startsWith(t)));if(!r)return'';const i=r.findIndex(c=>N(c).startsWith(t));return r.slice(i+1).find(c=>c!=='')??''},
+  dt=g('data:'),pv=g('data prevista'),co=g('conta de origem'),cd=g('conta de destino');
+  if(dt)TD.data=toIso(dt);if(pv)TD.prev=toIso(pv);if(co)TD.orig=String(co);if(cd)TD.dest=String(cd)}
+ TD.base=out.map(o=>o.d).sort()[0]||'';
+ return out.map(o=>{const s=S2[o.d]||{};return norm({...s,...o,adi:o.adi||s.adi})});
+}
+function setData(arr){D=arr.sort((a,b)=>a.d<b.d?-1:1);
+ $('#sel').innerHTML=D.slice().reverse().map(x=>`<option value="${x.d}">${br(x.d)}</option>`).join('')+'<option value="">Todas as Data_Base</option>';
+ sel=D.length?D[D.length-1].d:'';$('#sel').value=sel;pg=1;render()}
+$('#fi').onchange=e=>{if(ROLE!='admin')return;const fl=e.target.files[0];if(!fl)return;const r=new FileReader();
+ r.onload=ev=>{try{const d=parse(XLSX.read(ev.target.result,{type:'array'}));if(!d.length)throw 0;setData(d);msg(`✔ ${d.length} Data_Base carregada(s) de "${fl.name}"`)}catch(x){msg('Não foi possível ler o arquivo. Verifique as colunas (Data_Base, Base de Cálculo, ISS, INSS, Valor Líquido...).',1)}};
+ r.readAsArrayBuffer(fl);e.target.value=''};
+function msg(t,e){const m=$('#toast');m.textContent=t;m.className='text-sm rounded-lg px-3 py-2 '+(e?'bg-rose-500/10 text-rose-500':'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400');setTimeout(()=>m.classList.add('hidden'),6000)}
+
+/* ---------- Render ---------- */
+const sum=(r,k)=>r.reduce((a,x)=>a+x[k],0),cur=()=>sel?D.filter(x=>x.d==sel):D,CH={};
+function mk(id,t,data,o={}){CH[id]&&CH[id].destroy();CH[id]=new Chart($('#'+id),{type:t,data,options:{responsive:true,maintainAspectRatio:false,...o}})}
+function rank(id,it){const m=Math.max(...it.map(a=>a[1]),1);$('#'+id).innerHTML=it.length?it.map((a,i)=>`<div class="mb-3"><div class="flex justify-between text-sm gap-2"><span>${i+1}. ${a[0]}</span><b>${f(a[1])}</b></div><div class="h-2 rounded bg-slate-200 dark:bg-slate-800"><div class="h-2 rounded" style="width:${a[1]/m*100}%;background:${P[i%7]}"></div></div></div>`).join(''):'<p class="text-sm text-slate-400">Sem dados</p>'}
+function render(){
+ const r=cur(),b=sum(r,'bruto');
+ const kp=[['bruto',`Deduções ${f(sum(r,'ded'))} · Base de Cálculo ${f(sum(r,'base'))}`],['liq',`Impostos ${f(sum(r,'ret'))} (${b?p(sum(r,'ret')/b):'—'} do bruto)`],['sal',`(-) Desconto Adiantamento ${f(-sum(r,'adi'))}`],['fr',(FR*100)+'% do Faturamento Líquido']];
+ $('#kpis').innerHTML=kp.map((a,i)=>{const w=a[0]=='fr';return`<div class="card border-t-4 ${w?'!bg-indigo-100 dark:!bg-indigo-600 text-black dark:text-white':''}" style="border-top-color:${P[i]}"><p class="text-xs uppercase ${w?'text-black dark:text-indigo-100':'text-slate-500'}">${L[a[0]]}</p><p class="text-xl sm:text-2xl font-bold mt-1">${f(sum(r,a[0]))}</p><p class="text-xs mt-1 ${w?'text-black dark:text-indigo-100':'text-slate-400'}">${a[1]}</p></div>`}).join('');
+ const tc=Chart.defaults.color,tx=TXK.map(k=>[TX[k],sum(r,k)]).filter(a=>a[1]>0).sort((a,b)=>b[1]-a[1]),tt=tx.reduce((a,c)=>a+c[1],0);
+ const dl={anchor:'end',align:'end',color:tc,font:{size:11,weight:'bold'},formatter:v=>f(v)};
+ if(sel)mk('c1','bar',{labels:[['Valor Bruto','da NF'],['Impostos'],['Faturamento Líquido','(de Impostos)'],['(-) Desconto','Adiantamento'],['Saldo a Receber','do Cliente'],['Fundo de Reserva']],datasets:[{data:['bruto','ret','liq','adi','sal','fr'].map(k=>sum(r,k)),backgroundColor:P,borderRadius:6,maxBarThickness:90}]},
+  {scales:{y:{display:false,grace:'18%'},x:{grid:{display:false}}},plugins:{legend:{display:false},datalabels:dl,tooltip:{callbacks:{label:c=>' '+f(c.parsed.y)}}}});
+ else{const cf=v=>v>=1e6?'R$ '+(v/1e6).toLocaleString('pt-BR',{maximumFractionDigits:2})+' mi':v>=1e3?'R$ '+(v/1e3).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mil':f(v),
+   mb=Math.max(...r.map(x=>x.bruto),1),mf=Math.max(...r.map(x=>x.fr),1),sh=r.length<=6,
+   lb=(c,o)=>({display:sh,anchor:'end',align:'end',color:c,font:{size:10,weight:'bold'},formatter:cf,...o}),
+   bar=(l,k,c)=>({type:'bar',label:l,data:r.map(x=>x[k]),backgroundColor:c,borderRadius:6,maxBarThickness:46,yAxisID:'y',order:2,datalabels:lb(tc)});
+  mk('c1','bar',{labels:r.map(x=>br(x.d)),datasets:[bar('Valor Bruto','bruto',P[0]),bar('Faturamento Líquido','liq',P[1]),
+   {type:'line',label:'Fundo de Reserva (1% do Líquido)',data:r.map(x=>x.fr),borderColor:P[2],backgroundColor:P[2],borderWidth:3,pointRadius:5,pointHoverRadius:7,tension:.25,yAxisID:'y1',order:1,datalabels:lb(P[2],{display:r.length<=12,align:'top',offset:6,font:{size:11,weight:'bold'}})}]},
+  {interaction:{mode:'index',intersect:false},
+   scales:{x:{grid:{display:false}},y:{display:false,beginAtZero:true,max:mb*1.7},y1:{display:false,min:-mf*1.8,max:mf*1.25}},
+   plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,padding:16}},tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+f(c.parsed.y)}}}})}
+ mk('c2','doughnut',{labels:tx.map(a=>a[0]),datasets:[{data:tx.map(a=>a[1]),backgroundColor:P,borderWidth:0}]},
+  {cutout:'40%',plugins:{legend:{display:false},datalabels:{color:'#fff',font:{size:12,weight:'bold'},display:c=>c.dataset.data[c.dataIndex]/tt>.015,formatter:v=>p(v/tt)},tooltip:{callbacks:{label:c=>' '+c.label+': '+f(c.parsed)}}}});
+ rank('r1',tx);
+ $('#t1').textContent=sel?'Leitura da Data_Base '+br(sel)+' — do bruto ao Fundo de Reserva':'Evolução por Data_Base';
+ $('#per').innerHTML=sel?'Período exibido: <b>'+br(sel)+'</b>':'Período exibido: <b>Todas as Data_Base</b> (consolidado)';
+ const i=sel?D.findIndex(x=>x.d==sel):D.length-1;
+ $('#cmp').innerHTML=i<1?'<p class="text-sm text-slate-400">É necessário ao menos dois períodos (Data_Base) para comparar. Carregue mais períodos via Upload.</p>':
+  `<table class="w-full text-sm"><thead class="text-xs uppercase text-slate-500 text-left"><tr><th class="py-2">Indicador</th><th>${br(D[i].d)}</th><th>${br(D[i-1].d)} (anterior)</th><th>Variação</th></tr></thead><tbody>`+
+  K.map(k=>{const a=D[i][k],c=D[i-1][k],v=c?(a-c)/c*100:0;return`<tr class="border-t border-slate-200 dark:border-slate-800"><td class="py-2">${L[k]}</td><td>${f(k=='adi'?-a:a)}</td><td>${f(k=='adi'?-c:c)}</td><td class="font-semibold ${v>=0?'text-emerald-500':'text-rose-500'}">${v>=0?'▲':'▼'} ${Math.abs(v).toFixed(1).replace('.',',')}%</td></tr>`}).join('')+'</tbody></table>';
+ T()}
+const fm=(k,x)=>k=='d'?br(x.d):k=='aliq'?p(x.aliq):f(k=='adi'?-x[k]:x[k]);
+function flt(){const q=$('#q').value.toLowerCase(),a=$('#d1').value,b=$('#d2').value;
+ return cur().filter(x=>(!a||x.d>=a)&&(!b||x.d<=b)&&(!q||C.map(c=>fm(c[0],x)).join(' ').toLowerCase().includes(q))).sort((x,y)=>(x[sk]>y[sk]?1:-1)*sd)}
+function srt(k){sd=sk==k?-sd:1;sk=k;T()}
+function T(){const r=flt(),ps=+$('#ps').value,pages=Math.ceil(r.length/ps)||1;pg=Math.max(1,Math.min(pg,pages));
+ $('#th').innerHTML='<tr>'+C.map(c=>`<th class="px-3 py-2 cursor-pointer whitespace-nowrap" onclick="srt('${c[0]}')">${c[1]}${sk==c[0]?(sd>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+ $('#tb').innerHTML=r.slice((pg-1)*ps,pg*ps).map(x=>'<tr class="border-t border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">'+C.map(c=>`<td class="px-3 py-2 whitespace-nowrap ${c[0]=='fr'?'font-semibold text-indigo-500':''}">${fm(c[0],x)}</td>`).join('')+'</tr>').join('')||`<tr><td colspan="${C.length}" class="p-4 text-center text-slate-400">Nenhum registro encontrado</td></tr>`;
+ $('#cnt').textContent=r.length+' registro(s)';$('#pgi').textContent=`${pg} / ${pages}`}
+
+/* ---------- Exportações ---------- */
+function xl(){const r=flt(),ws=XLSX.utils.json_to_sheet(r.map(x=>Object.fromEntries(C.map(c=>[c[1],c[0]=='d'?br(x.d):c[0]=='adi'?-x.adi:x[c[0]]])))),wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,'Fundo de Reserva');saveAs('fundo_reserva_'+(sel||'todas')+'.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))}
+function pdf(){const d=new jspdf.jsPDF('l','pt','a4'),r=flt(),cs=['d','bruto','ret','liq','adi','sal','fr'];
+ d.addImage(LOGO,'PNG',40,22,36*LR,36);d.setFontSize(16).text('Gestão Financeira CSD · Dashboard Executivo',40+36*LR+14,40);d.setFontSize(10).text('Data_Base: '+(sel?br(sel):'Todas')+' · Gerado em '+new Date().toLocaleString('pt-BR'),40+36*LR+14,56);
+ d.autoTable({startY:75,head:[['Indicador','Valor']],body:K.map(k=>[L[k],f((k=='adi'?-1:1)*sum(cur(),k))]),headStyles:{fillColor:[79,70,229]},tableWidth:340});
+ d.autoTable({startY:d.lastAutoTable.finalY+20,head:[C.filter(c=>cs.includes(c[0])).map(c=>c[1])],body:r.map(x=>cs.map(k=>fm(k,x))),headStyles:{fillColor:[79,70,229]}});
+ saveAs('fundo_reserva_dashboard.pdf',d.output('arraybuffer'))}
+/* Nº do documento: sequencial por ano, na ordem das Data_Base (ex.: 001/2026, 002/2026...).
+   O número é por Data_Base de faturamento; o 1º período usa o número da planilha (aba "NNN-AAAA_Memória"); se não houver, começa em 001. */
+function docNo(x){const y=x.d.slice(0,4),i=D.filter(r=>r.d.slice(0,4)==y).findIndex(r=>r.d==x.d),m=String(DOC).match(/^(\d+)\/(\d{4})$/),s=m&&m[2]==y?+m[1]:1;
+ return String(s+i).padStart(3,'0')+'/'+y}
+/* Termo de RESPONSÁVEIS (PDF paisagem, layout da planilha) — não aparece no dashboard */
+const tget=()=>{try{return JSON.parse(localStorage.csd_termo_v1)||{}}catch(e){return{}}};
+function termo(){if(ROLE!='admin')return;const x=sel?D.find(r=>r.d==sel):D[D.length-1];if(!x)return;
+ const o={orig:TD.orig,dest:TD.dest,data:'',prev:'',...(x.d==TD.base?{data:TD.data,prev:TD.prev}:{}),...tget()[x.d]};if(!o.data)o.data=new Date().toISOString().slice(0,10);
+ const I=(id,l,v,t)=>`<label class="block text-sm mb-1">${l}</label><input id="${id}" type="${t||'text'}" class="inp w-full mb-3" value="${esc(v)}">`;
+ mo(`<h2 class="text-lg font-bold mb-1">Termo para assinatura</h2><p class="text-sm text-slate-500 mb-4">Documento nº ${docNo(x)} · Data_Base ${br(x.d)}</p>${I('t-d','Data do documento',o.data,'date')}${I('t-p','Data prevista da transferência',o.prev,'date')}${I('t-o','Conta de origem - CSD',o.orig)}${I('t-t','Conta de destino - Fundo de Reserva',o.dest)}<div class="flex justify-end gap-2"><button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="termoOk('${x.d}')">Gerar PDF</button></div>`)}
+function termoOk(b){const x=D.find(r=>r.d==b),o={data:$('#t-d').value,prev:$('#t-p').value,orig:$('#t-o').value.trim(),dest:$('#t-t').value.trim()},a=tget();a[b]=o;try{localStorage.csd_termo_v1=JSON.stringify(a)}catch(e){}closeMd();termoGerar(x,o)}
+/* Página 1 do Termo (aba "NNN-AAAA"): memória resumida e solicitação de transferência — A4 retrato */
+function pag1(d,x,o){const HB=[180,198,231],LB=[217,225,242],X=40,W=515,pc=(FR*100).toLocaleString('pt-BR')+'%',
+ T=(t,xx,yy,sz,b,al)=>d.setFont('helvetica',b?'bold':'normal').setFontSize(sz).setTextColor(0).text(String(t),xx,yy,{align:al||'left'}),
+ P=(t,yy,sz)=>{const l=d.splitTextToSize(t,W);d.setFont('helvetica','normal').setFontSize(sz).setTextColor(0).text(l,X,yy);return yy+l.length*sz*1.3},
+ Bx=(x0,y0,w,h,fc)=>{d.setDrawColor(90).setLineWidth(.5);if(fc)d.setFillColor(...fc);d.rect(x0,y0,w,h,fc?'FD':'S')},
+ Rw=(y,h,a,b,o2={})=>{Bx(X,y,o2.c||330,h,o2.fa);Bx(X+(o2.c||330),y,W-(o2.c||330),h,o2.fb);T(a,o2.ca?X+(o2.c||330)/2:X+4,y+h/2+3,8.5,o2.ba,o2.ca?'center':'left');T(b,o2.cb?X+(o2.c||330)+(W-(o2.c||330))/2:o2.vl?X+(o2.c||330)+4:X+W-4,y+h/2+3,8.5,o2.bb,o2.cb?'center':o2.vl?'left':'right');return y+h},
+ Sx=(t,y)=>{T(t,X,y,9,1);return y+13};
+ d.addImage(LOGO,'PNG',X,22,110,110/LR);
+ d.setFillColor(...HB).rect(X,76,W,42,'F');T('MEMÓRIA DE CÁLCULO E SOLICITAÇÃO DE TRANSFERÊNCIA',X+W/2,94,12.5,1,'center');T('DE RECURSOS PARA O FUNDO DE RESERVA',X+W/2,110,12.5,1,'center');
+ T('Documento nº: '+docNo(x),X+W,132,9,1,'right');T('Data: '+(o.data?br(o.data):''),X+W,144,9,1,'right');
+ let y=Sx('1. OBJETIVO',166);y=P('Formalizar a memória de cálculo e solicitar a autorização dos representantes legais das empresas consorciadas para a transferência de recursos da conta corrente do Consórcio para a conta bancária, também do Consórcio, destinada ao Fundo de Reserva, no Banco Santander, em atendimento ao percentual previsto na NPO, conforme cláusula 3.4 (Aportes), alínea V.',y,8.5)+14;
+ y=Sx('2. MEMÓRIA DE CÁLCULO RESUMIDA',y);y=Rw(y,15,'Descrição','Valor',{fa:LB,fb:LB,ba:1,bb:1,ca:1,cb:1});
+ y=Rw(y,15,'Valor recebido',f(x.liq));y=Rw(y,15,'Percentual do Fundo de Reserva (NPO)',pc);y=Rw(y,15,'Valor a ser transferido para o Fundo de Reserva',f(x.fr),{bb:1})+16;
+ y=Sx('3. SOLICITAÇÃO DE AUTORIZAÇÃO',y);y=P('Com base na memória de cálculo acima e nas disposições da NPO, solicita-se a autorização dos representantes legais/conselho executivo das empresas consorciadas para a transferência do valor calculado da conta corrente do Consórcio para a conta bancária do Fundo de Reserva, no Banco Santander.',y,10)+10;
+ y=Sx('4. DADOS DA TRANSFERÊNCIA',y);const R4=(a,b,bb)=>{y=Rw(y,15,a,b,{c:200,fa:LB,ba:1,vl:1,bb})};
+ R4('Conta de origem - CSD',o.orig);R4('Conta de destino - Fundo de Reserva',o.dest);R4('Valor da transferência',f(x.fr),1);R4('Data prevista',o.prev?br(o.prev):'');y+=16;
+ y=Sx('5. AUTORIZAÇÃO DOS REPRESENTANTES LEGAIS',y);y=P('Os representantes legais abaixo identificados, na qualidade de representantes das empresas consorciadas, manifestam sua autorização para a transferência acima.',y,10)+8;
+ y=Rw(y,16,'EMPRESA CONSORCIADA','REPRESENTANTE LEGAL',{c:260,fa:LB,fb:LB,ba:1,bb:1,ca:1,cb:1});
+ EMP.forEach(e=>{Bx(X,y,260,40);Bx(X+260,y,W-260,40);T(e,X+130,y+23,8.5,0,'center');y+=40})}
+function termoGerar(x,o){if(ROLE!='admin')return;
+ const d=new jspdf.jsPDF('p','pt','a4'),s=.648,B=[31,78,121],LB=[221,235,247],MB=[155,194,230],NV=[31,56,100],G=[166,166,166],GL=[217,217,217],W=[255,255,255],
+ R=(x0,y0,x1,y1,fc,lc)=>{if(fc)d.setFillColor(...fc);if(lc)d.setDrawColor(...lc);d.rect(x0*s,y0*s,(x1-x0)*s,(y1-y0)*s,fc&&lc?'FD':fc?'F':'S')},
+ T=(t,xx,yy,sz,b,al,col)=>{d.setFont('helvetica',b?'bold':'normal').setFontSize(sz*s).setTextColor(...(col||[0,0,0])).text(String(t),xx*s,yy*s,{align:al||'left'})},
+ V=(c,y0,y1,col,lw)=>{d.setDrawColor(...col).setLineWidth(lw);c.forEach(v=>d.line(v*s,y0*s,v*s,y1*s))},
+ [yy,mm]=x.d.split('-'),ME=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'],
+ pc=(v,n=2)=>(v*100).toFixed(n).replace('.',',')+'%',bp=v=>x.bruto?pc(v/x.bruto):'-',f0=v=>'R$ '+Math.round(v).toLocaleString('pt-BR');
+ pag1(d,x,o);d.addPage('a4','l');d.setLineWidth(.5);
+ /* logo + título */
+ d.addImage(LOGO,'PNG',88*s,115*s,137*s,137*s/LR);
+ R(85,181,1208,204,B,B);T('APURAÇÃO DA TRANSFERÊNCIA PARA O FUNDO DE RESERVA',646,198,19,1,'center',W);
+ T('Documento nº:',258,217,12,1,'right');T(docNo(x),318,217,12,0,'center');
+ T('Data base referência:',258,236,12,1,'right');T(ME[+mm-1]+', '+yy,318,236,12,0,'center',[255,0,0]);
+ T(`Apuração do Fundo de Reserva (${pc(FR,0)} / Faturamento Líquido)`,630,256,13,1,'right',B);R(678,243,816,262,[255,242,204],G);T(pc(FR),747,257,13,1,'center',[0,0,255]);
+ /* KPIs */
+ const kc=[85,388,678,956,1208],kl=['FATURAMENTO LÍQUIDO (DE IMPOSTOS)','(-) DEDUÇÃO DO ADIANTAMENTO','SALDO A RECEBER DO CLIENTE','TRANSFERIR AO FUNDO DE RESERVA'],kv=[x.liq,-x.adi,x.sal,x.fr];
+ R(85,262,1208,279,B,B);R(85,280,1208,312,LB);V(kc.slice(1,-1),262,312,W,1.2);
+ kl.forEach((t,i)=>{const c=(kc[i]+kc[i+1])/2;T(t,c,274,11,1,'center',W);T(f(kv[i]),c,301,17,1,'center',NV)});
+ /* detalhamento */
+ T('DETALHAMENTO POR PERÍODO',88,327,13,1,'left',B);
+ const cb=[85,249,388,526,677,816,955,1093,1208],hd=['Data Base','Valor Bruto da NF','(-) Impostos',['Faturamento Líquido','(de Impostos)'],['(-) Desconto','Adiantamento'],['Saldo a Receber','do Cliente'],'Fundo de Reserva','Impostos s/ Bruto'],
+ vl=[br(x.d),f(x.bruto),f(x.ret),f(x.liq),f(-x.adi),f(x.sal),f(x.fr),pc(x.bruto?x.ret/x.bruto:0,1)];
+ R(85,332,1208,364,B,B);V(cb.slice(1,-1),332,364,W,1);
+ hd.forEach((h,i)=>{const c=(cb[i]+cb[i+1])/2,a=[].concat(h);a.length>1?a.forEach((t,j)=>T(t,c,344+j*13,11,1,'center',W)):T(a[0],c,352,11,1,'center',W)});
+ [364,380].forEach((y,r)=>{R(85,y,1208,y+(r?17:16),W,GL);V(cb.slice(1,-1),y,y+17,GL,.5)});
+ R(677,364,816,380,[255,242,204],GL);
+ vl.forEach((t,i)=>i?T(t,cb[i+1]-5,376,11,i==6,'right',i==6?NV:[0,0,0]):T(t,(cb[0]+cb[1])/2,376,11,0,'center'));
+ R(85,398,1208,415,MB,MB);d.setDrawColor(...B).setLineWidth(1.6).line(85*s,398*s,1208*s,398*s);
+ T('TOTAL',(cb[0]+cb[1])/2,411,12,1,'center',NV);vl.forEach((t,i)=>i&&T(t,cb[i+1]-5,411,11,1,'right',NV));
+ /* memória de cálculo */
+ R(85,427,527,443,B,B);T('MEMÓRIA DE CÁLCULO',306,439,12,1,'center',W);
+ R(85,443,527,460,MB,MB);T('Indicador',167,455,11,1,'center',NV);T('Valor (R$)',318,455,11,1,'center',NV);T('% do Bruto',457,455,11,1,'center',NV);
+ [['Valor Bruto da NF',x.bruto,0],['(-) Impostos',x.ret,0],['Fat. Líquido (de Impostos)',x.liq,1],['(-) Desconto Adiantamento',x.adi,0],['Saldo a Receber do Cliente',x.sal,0],['Fundo de Reserva',x.fr,1]].forEach((r,i)=>{
+  const y=460+i*17;R(85,y,527,y+17,i%2?[242,242,242]:W,GL);V([249,388],y,y+17,GL,.5);
+  T(r[0],89,y+12.5,11,r[2]);T(f0(r[1]),384,y+12.5,11,r[2],'right');T(bp(r[1]),523,y+12.5,11,r[2],'right')});
+ /* gráfico: Composição do Faturamento */
+ d.setDrawColor(64,64,64).setLineWidth(.8).roundedRect(623*s,423*s,545*s,146*s,10*s,10*s,'S');
+ T('Composição do Faturamento (R$)',896,447,17,1,'center',[38,38,38]);
+ const mx=x.bruto||1;
+ [['Valor Bruto da NF',x.bruto],['(-) Impostos',x.ret],['Faturamento Líquido',x.liq],['(-) Desconto Adiantamento',x.adi],['Saldo a Receber',x.sal]].forEach((r,i)=>{
+  const cy=462+i*21.8,w=294*Math.max(r[1],0)/mx;T(r[0],752,cy+3.5,9,1,'right',[38,38,38]);R(763,cy-5,763+w,cy+5,NV);T(f0(r[1]),763+w+6,cy+3.5,9,1,'left',[38,38,38])});
+ d.setDrawColor(...G).setLineWidth(.5).line(763*s,454*s,763*s,562*s);
+ saveAs('termo_'+docNo(x).replace('/','-')+'_'+x.d+'.pdf',d.output('arraybuffer'))}
+
+
+</script>
+<script>
+/* Usuários — Supabase (Auth + public.perfis). O navegador só LÊ perfis; toda escrita passa pela Edge Function admin-usuarios */
+const LRX=/^[a-z0-9._-]{3,30}$/,IDLE=30*60e3,PWMSG='A senha deve ter ao menos 8 caracteres, com letras e números.',
+ esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+ pwOk=p=>typeof p=='string'&&p.length>=8&&/[a-zA-Z]/.test(p)&&/\d/.test(p),
+ tr=m=>/different/i.test(m)?'Escolha uma senha diferente da atual.':/weak|at least/i.test(m)?PWMSG:m;
+let US=[],AUD=[],ME='',PF=null;
+const admins=()=>US.filter(x=>x.papel=='admin'&&x.ativo).length;
+async function uLog(e){try{await sb_.rpc('log_evento',{e})}catch(x){}}
+function mo(h){$('#mdb').innerHTML=h;$('#md').classList.remove('hidden')}
+function closeMd(){$('#md').classList.add('hidden')}
+let _yes=null;
+function dlg(t,x,fn){_yes=fn;mo(`<h2 class="text-lg font-bold mb-2">${t}</h2><p class="text-sm text-slate-500 mb-4">${x}</p><div class="flex justify-end gap-2">${fn?'<button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="closeMd();_yes()">Confirmar</button>':'<button class="btn" onclick="closeMd()">OK</button>'}</div>`)}
+const merr=m=>{const e=$('#me');e.textContent=m;e.classList.remove('hidden')},lbl=t=>`<label class="block text-sm mb-1">${t}</label>`;
+async function uRender(){const er=$('#uerr');er.classList.add('hidden');
+ try{const a=await sb_.from('perfis').select('*').order('criado_em');if(a.error)throw a.error;US=a.data||[];
+  const g=await sb_.from('auditoria').select('*').order('t',{ascending:false}).limit(15);AUD=g.data||[]}
+ catch(e){er.textContent='Não foi possível carregar os usuários: '+e.message;er.classList.remove('hidden');return}
+ const b='btn2 !py-1 !text-xs';
+ $('#utb').innerHTML=US.map(u=>{const me=PF&&u.id==PF.id,last=u.papel=='admin'&&u.ativo&&admins()<2,dis=last?'disabled title="É preciso manter ao menos um administrador ativo" style="opacity:.4"':'';
+  return `<tr class="border-t border-slate-200 dark:border-slate-800"><td class="px-3 py-2 font-medium">${esc(u.nome)}${me?' <span class="text-xs text-slate-500">(você)</span>':''}</td><td class="px-3 py-2">${esc(u.login)}</td><td class="px-3 py-2">${u.papel=='admin'?'Administrador':'Visualizador'}</td>
+  <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs ${u.ativo?'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400':'bg-slate-500/20 text-slate-500'}">${u.ativo?'Ativo':'Desativado'}</span>${u.mc?' <span class="text-xs text-amber-500">troca de senha pendente</span>':''}</td>
+  <td class="px-3 py-2 text-right whitespace-nowrap space-x-1"><button class="${b}" onclick="uForm('${u.id}')">Editar</button><button class="${b}" onclick="uReset('${u.id}')">Redefinir senha</button>${me?'':`<button class="${b}" ${dis} onclick="uToggle('${u.id}')">${u.ativo?'Desativar':'Ativar'}</button><button class="${b} !text-rose-500" ${dis} onclick="uDel('${u.id}')">Excluir</button>`}</td></tr>`}).join('');
+ $('#ulog').innerHTML=AUD.map(x=>`<tr class="border-t border-slate-200 dark:border-slate-800"><td class="px-3 py-1.5 whitespace-nowrap">${new Date(x.t).toLocaleString('pt-BR')}</td><td class="px-3 py-1.5">${esc(x.usuario)}</td><td class="px-3 py-1.5">${esc(x.evento)}</td></tr>`).join('')||'<tr><td class="px-3 py-2 text-slate-500" colspan="3">Sem registros.</td></tr>'}
+function uForm(id){const u=US.find(x=>x.id==id),nw=!u,me=u&&PF&&u.id==PF.id;
+ mo(`<h2 class="text-lg font-bold mb-4">${nw?'Novo usuário':'Editar usuário'}</h2>
+ ${lbl('Nome')}<input id="uf-n" class="inp w-full mb-3" value="${esc(u?u.nome:'')}">
+ ${lbl('Usuário (login)')}<input id="uf-l" class="inp w-full mb-3" value="${esc(u?u.login:'')}" placeholder="ex.: maria.silva" ${nw?'':'disabled'}>
+ ${lbl('Perfil')}<select id="uf-r" class="inp w-full mb-3" ${me?'disabled':''}><option value="viewer" ${u&&u.papel=='viewer'?'selected':''}>Visualizador (só consulta e exporta)</option><option value="admin" ${u&&u.papel=='admin'?'selected':''}>Administrador (tudo, inclusive usuários)</option></select>
+ ${nw?`${lbl('Senha inicial (mín. 8, com letras e números)')}<input id="uf-p" type="password" autocomplete="new-password" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox"> Exigir troca de senha no primeiro acesso</label>`:''}
+ <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
+ <div class="flex justify-end gap-2"><button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="uSaveForm('${nw?'':u.id}')">Salvar</button></div>`)}
+async function uRun(p){try{await adminUsuarios(p);closeMd();await uRender()}catch(e){merr(e.message)}finally{const x=$('#uf-p');if(x)x.value=''}}
+async function uOp(p){try{await adminUsuarios(p);await uRender()}catch(e){dlg('Não foi possível concluir',esc(e.message))}}
+function uSaveForm(id){const n=$('#uf-n').value.trim(),r=$('#uf-r').value;if(!n)return merr('Informe o nome.');
+ if(id)return uRun({a:'update',id,n,r});
+ const l=$('#uf-l').value.trim().toLowerCase(),pw=$('#uf-p').value;
+ if(!LRX.test(l))return merr('Usuário: 3 a 30 caracteres (letras minúsculas, números, ponto, hífen ou _).');
+ if(US.some(x=>x.login==l))return merr('Esse usuário já existe.');
+ if(!pwOk(pw))return merr(PWMSG);
+ return uRun({a:'create',l,n,r,pw,mc:$('#uf-m').checked})}
+function uReset(id){const u=US.find(x=>x.id==id);mo(`<h2 class="text-lg font-bold mb-1">Redefinir senha</h2><p class="text-sm text-slate-500 mb-4">Usuário: ${esc(u.login)}</p>
+ ${lbl('Nova senha (mín. 8, com letras e números)')}<input id="uf-p" type="password" autocomplete="new-password" class="inp w-full mb-3"><label class="flex items-center gap-2 text-sm mb-3"><input id="uf-m" type="checkbox"> Exigir troca de senha no próximo acesso</label>
+ <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
+ <div class="flex justify-end gap-2"><button class="btn2" onclick="closeMd()">Cancelar</button><button class="btn" onclick="uDoReset('${id}')">Salvar</button></div>`)}
+function uDoReset(id){const pw=$('#uf-p').value;if(!pwOk(pw))return merr(PWMSG);return uRun({a:'reset',id,pw,mc:$('#uf-m').checked})}
+function uToggle(id){return uOp({a:'toggle',id})}
+function uDel(id){const u=US.find(x=>x.id==id);if(!u)return;dlg('Excluir usuário','Excluir "'+esc(u.login)+'"? Esta ação não pode ser desfeita.',()=>uOp({a:'delete',id}))}
+function pwModal(forced){mo(`<h2 class="text-lg font-bold mb-1">${forced?'Defina uma nova senha':'Alterar minha senha'}</h2>${forced?'<p class="text-sm text-slate-500 mb-4">Por segurança, troque a senha provisória para continuar.</p>':'<div class="mb-4"></div>'}
+ ${forced?'':lbl('Senha atual')+'<input id="pw0" type="password" autocomplete="current-password" class="inp w-full mb-3">'}
+ ${lbl('Nova senha (mín. 8, com letras e números)')}<input id="pw1" type="password" autocomplete="new-password" class="inp w-full mb-3">${lbl('Repita a nova senha')}<input id="pw2" type="password" autocomplete="new-password" class="inp w-full mb-3">
+ <p id="me" class="hidden text-sm text-rose-500 mb-3"></p>
+ <div class="flex justify-end gap-2"><button class="btn2" onclick="${forced?'logout()':'closeMd()'}">${forced?'Sair':'Cancelar'}</button><button class="btn" onclick="pwSave(${forced?1:0})">Salvar</button></div>`)}
+async function pwSave(forced){const a=$('#pw1').value;
+ try{if(!forced){const r=await sb_.auth.signInWithPassword({email:PF.email,password:$('#pw0').value});if(r.error)return merr('Senha atual incorreta.')}
+  if(!pwOk(a))return merr(PWMSG);if(a!==$('#pw2').value)return merr('As senhas não conferem.');
+  const r=await sb_.auth.updateUser({password:a});if(r.error)return merr(tr(r.error.message));
+  await sb_.rpc('limpar_mc');uLog('alterou a própria senha');closeMd();if(forced)await enter()}
+ catch(e){merr('Falha ao alterar a senha: '+e.message)}
+ finally{['pw0','pw1','pw2'].forEach(i=>{const x=$('#'+i);if(x)x.value=''})}}
+
+</script>
+<script>
+/* Módulo Boletim de Caixa — hoje mostra apenas "Em Desenvolvimento".
+   Tela: index.html → <main data-view="boletim">   ·   Menu: js/core/main.js → MODS (id 'boletim')
+
+   MÓDULO ISOLADO: todo o código fica dentro da função abaixo, então nomes como render, T, D, sum...
+   podem ser usados aqui sem colidir com o Fundo de Reserva ou com outros módulos.
+   Do núcleo (js/core/app.js) pode usar: $ (seletor), f (moeda), p (percentual), br (data), N (texto sem acento),
+   e as variáveis globais ROLE ('admin'/'viewer') e ME (usuário logado).
+   Para o HTML poder chamar uma função (onclick="boletimSalvar()"), exponha-a em window, com o prefixo "boletim". */
+(() => {
+  'use strict';
+
+  const VIEW = document.querySelector('[data-view="boletim"]'); // a tela deste módulo
+
+  // ----- estado privado do módulo -----
+  // let dados = [];
+
+  // ----- funções do módulo -----
+  // function render() { /* desenha a tela dentro de VIEW */ }
+
+  // ----- o que o HTML precisa chamar (onclick etc.) -----
+  // window.boletimSalvar = () => { /* ... */ };
+})();
+
+</script>
+<script>
+/* Módulo REIDI — hoje mostra apenas "Em Desenvolvimento".
+   Tela: index.html → <main data-view="reidi">   ·   Menu: js/core/main.js → MODS (id 'reidi')
+
+   MÓDULO ISOLADO: todo o código fica dentro da função abaixo, então nomes como render, T, D, sum...
+   podem ser usados aqui sem colidir com o Fundo de Reserva ou com outros módulos.
+   Do núcleo (js/core/app.js) pode usar: $ (seletor), f (moeda), p (percentual), br (data), N (texto sem acento),
+   e as variáveis globais ROLE ('admin'/'viewer') e ME (usuário logado).
+   Para o HTML poder chamar uma função (onclick="reidiSalvar()"), exponha-a em window, com o prefixo "reidi". */
+(() => {
+  'use strict';
+
+  const VIEW = document.querySelector('[data-view="reidi"]'); // a tela deste módulo
+
+  // ----- estado privado do módulo -----
+  // let dados = [];
+
+  // ----- funções do módulo -----
+  // function render() { /* desenha a tela dentro de VIEW */ }
+
+  // ----- o que o HTML precisa chamar (onclick etc.) -----
+  // window.reidiSalvar = () => { /* ... */ };
+})();
+
+</script>
+<script>
+/* Módulo Fluxo de Caixa — hoje mostra apenas "Em Desenvolvimento".
+   Tela: index.html → <main data-view="fluxo">   ·   Menu: js/core/main.js → MODS (id 'fluxo')
+
+   MÓDULO ISOLADO: todo o código fica dentro da função abaixo, então nomes como render, T, D, sum...
+   podem ser usados aqui sem colidir com o Fundo de Reserva ou com outros módulos.
+   Do núcleo (js/core/app.js) pode usar: $ (seletor), f (moeda), p (percentual), br (data), N (texto sem acento),
+   e as variáveis globais ROLE ('admin'/'viewer') e ME (usuário logado).
+   Para o HTML poder chamar uma função (onclick="fluxoSalvar()"), exponha-a em window, com o prefixo "fluxo". */
+(() => {
+  'use strict';
+
+  const VIEW = document.querySelector('[data-view="fluxo"]'); // a tela deste módulo
+
+  // ----- estado privado do módulo -----
+  // let dados = [];
+
+  // ----- funções do módulo -----
+  // function render() { /* desenha a tela dentro de VIEW */ }
+
+  // ----- o que o HTML precisa chamar (onclick etc.) -----
+  // window.fluxoSalvar = () => { /* ... */ };
+})();
+
+</script>
+<script>
+/* Módulo Dashboard — Fluxo de Caixa Realizado (interativo).
+   MÓDULO ISOLADO: tudo dentro da função; expõe só window.dash. Usa do núcleo: N, saveAs, ROLE.
+   Base (Upload, só administrador): planilha com abas "Contas a Receber (Realizado)", "Contas a Pagar (Realizado)" e "Plano de Naturezas".
+   Parâmetro de CONTA: o painel usa por padrão a conta principal (1ª linha da aba CONTA_BANCARIA); cada lançamento carrega 'Conta Banco'.
+   Aba INVESTIMENTO alimenta a aba Saldos (CDB / Compromissadas / Contamax): aplicações e rendimentos somam; resgates e IR sobre resgate (nat. 2.9905) DEDUZEM o saldo.
+   Regras (conferidas com o Power BI): Entradas = Receber; Saídas = Pagar; Investimentos (CDB/COMPROMISSADA/CONTAMAX)
+   e Transferências entre contas ficam fora de Entradas/Saídas. Saldo Final = Saldo Inicial + Entradas − Saídas − variação aplicada + transferências.
+   Interação: clique em cartões, células da tabela e barras dos gráficos abre a janela de lançamentos (com histórico);
+   na aba Fornecedores, clique em fornecedor/categoria filtra tudo (clique de novo para limpar). */
+(() => {
+ 'use strict';
+ const VIEW=document.querySelector('[data-view="dash"]'),KEY='csd_dash_v4',INV=['CDB','COMPROMISSADA','CONTAMAX'],
+  MN=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+ let PL={"2.9008":"Distribuição Antecipada","9.01013":"CDB","2.10010":"Outras Receitas","2.0123":"Alimentação","2.0605":"Seguros","2.0210":"Serviços de Terceiros","2.0905":"Serviços de Terceiros","2.1008":"Reembolso/Prestação de Contas","2.0617":"Serviços de Terceiros","2.0207":"Folha e Benefícios","2.1015":"Locação de Imóveis","2.0907":"Transporte/Logística","2.0920":"Impostos/Tributos e Taxas","2.0135":"Alimentação","2.1304":"Viagens/Deslocamento","9.01012":"COMPROMISSADA","2.0407":"Locação de Equipamentos/Veículos","2.1305":"Reembolso/Prestação de Contas","2.0201":"Folha e Benefícios","2.9904":"Impostos/Tributos e Taxas","2.0401":"Locação de Equipamentos/Veículos","2.0615":"Serviços de Terceiros","2.0211":"Materiais/Peças/Ferramentas","2.0614":"Serviços de Terceiros","2.1301":"Viagens/Deslocamento","2.0114":"Materiais/Peças/Ferramentas","2.0707":"Equipamentos/Informática","2.0904":"Materiais/Peças/Ferramentas","2.0110":"Materiais/Peças/Ferramentas","2.0118":"Materiais/Peças/Ferramentas","2.0119":"Materiais/Peças/Ferramentas","2.0120":"Materiais/Peças/Ferramentas","2.0203":"Folha e Benefícios","2.9903":"Impostos/Tributos e Taxas","2.9901":"Impostos/Tributos e Taxas","9.01011":"CONTAMAX","1.0201":"Entrada","1.0301":"Entrada","2.1001":"Impostos/Tributos e Taxas","2.9905":"Impostos/Tributos e Taxas","9.01022":"COMPROMISSADA","9.0101":"Transferência de Saída","9.01021":"CONTAMAX","9.01023":"COMPROMISSADA","9.0102":"Transferência de Entrada"},PX={"2.9008":"Saídas","9.01013":"Investimentos","2.10010":"Entrada","2.0123":"Saídas","2.0605":"Saídas","2.0210":"Saídas","2.0905":"Saídas","2.1008":"Saídas","2.0617":"Saídas","2.0207":"Saídas","2.1015":"Saídas","2.0907":"Saídas","2.0920":"Saídas","2.0135":"Saídas","2.1304":"Saídas","9.01012":"Investimentos","2.0407":"Saídas","2.1305":"Saídas","2.0201":"Saídas","2.9904":"Saídas","2.0401":"Saídas","2.0615":"Saídas","2.0211":"Saídas","2.0614":"Saídas","2.1301":"Saídas","2.0114":"Saídas","2.0707":"Saídas","2.0904":"Saídas","2.0110":"Saídas","2.0118":"Saídas","2.0119":"Saídas","2.0120":"Saídas","2.0203":"Saídas","2.9903":"Saídas","2.9901":"Saídas","9.01011":"Investimentos","1.0201":"Entrada","1.0301":"Entrada","2.1001":"Saídas","2.9905":"Investimentos","9.01022":"Investimentos","9.0101":"Saídas","9.01021":"Investimentos","9.01023":"Investimentos","9.0102":"Entrada"},RA=[["R","2026-07-30","BEOP","ATIVACAO CONTA-PIX BEOP","2.1008",10.0,"","","","13010565"],["R","2026-07-31","TECON SALVADOR S/A","ADIANTAMENTO","1.0201",135031087.23,"RA","000000132","","13010565"],["R","2026-08-03","","RESGATE COMPROMISSADA","9.01022",27.0,"","","","13010565"],["R","2026-08-10","","RESGATE COMPROMISSADA","9.01022",70611.69,"","","","13010565"],["R","2026-08-11","","RESGATE CONTAMAX AUTOMATICO","9.01021",2.0,"","","","13010565"],["R","2026-08-17","","RESGATE COMPROMISSADA","9.01022",104570.85,"","","","13010565"],["R","2026-08-19","","RESGATE CONTAMAX AUTOMATICO","9.01021",100011.95,"","","","13010565"],["R","2026-08-19","","RESGATE COMPROMISSADA","9.01022",10259.45,"","","","13010565"],["R","2026-08-20","","RESGATE CONTAMAX AUTOMATICO","9.01021",18.0,"","","","13010565"],["R","2026-08-24","","RESGATE CONTAMAX AUTOMATICO","9.01021",794.89,"","","","13010565"],["R","2026-08-24","","RESGATE COMPROMISSADA","9.01022",20541.11,"","","","13010565"],["R","2026-08-25","","RESGATE CONTAMAX AUTOMATICO","9.01021",9.0,"","","","13010565"],["R","2026-08-26","","RESGATE COMPROMISSADA","9.01022",85307.14,"","","","13010565"],["R","2026-08-27","","RESGATE CONTAMAX AUTOMATICO","9.01021",68332.0,"","","","13010565"],["R","2026-08-28","","RESGATE CONTAMAX AUTOMATICO","9.01021",29.0,"","","","13010565"],["R","2026-08-31","","RESGATE CONTAMAX AUTOMATICO","9.01021",15691.4,"","","","13010565"],["R","2026-08-31","","VENCIMENTO COMPROMISSADA","9.01023",29952615.29,"","","","13010565"],["R","2026-09-01","","RESGATE CONTAMAX AUTOMATICO","9.01021",8.0,"","","","13010565"],["R","2026-09-02","","RESGATE COMPROMISSADA","9.01022",133065.84,"","","","13010565"],["R","2026-09-03","","RESGATE CONTAMAX AUTOMATICO","9.01021",4.5,"","","","13010565"],["R","2026-09-04","","RESGATE CONTAMAX AUTOMATICO","9.01021",69211.42,"","","","13010565"],["R","2026-09-08","","RESGATE CONTAMAX AUTOMATICO","9.01021",1.5,"","","","13010565"],["R","2026-09-09","","RESGATE COMPROMISSADAS","9.01022",350085.58,"","","","13010565"],["R","2026-09-10","","RESGATE CONTAMAX AUTOMATICO","9.01021",7.5,"","","","13010565"],["R","2026-09-11","","RESGATE COMPROMISSADA","9.01022",100083.61,"","","","13010565"],["R","2026-09-14","","RESGATE COMPROMISSADA","9.01022",100028.77,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",1.3,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",6.5,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",1.3,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",3.9,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",1.8,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",1.8,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",5.3,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",23.4,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",7.8,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",15.6,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",7.8,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",23.4,"","","","13010565"],["R","2026-09-14","ESTORNO DE TARIFA","ESTORNO DE TARIFA","2.10010",1.3,"","","","13010565"],["R","2026-09-15","","RESGATE CONTAMAX AUTOMATICO","9.01021",5.2,"","","","13010565"],["R","2026-09-16","","RESGATE CONTAMAX AUTOMATICO","9.01021",60919.1,"","","","13010565"],["R","2026-09-16","","TRANSF MESMA TITULARIDADE BCO SANTANDER","9.0102",5.0,"","","","13010587"],["P","2026-07-31","CTC INFRA E CONSTRUCOES LTDA","ADT DISTRIBUICAO ANTECIPADA  LUCROS_CTC","2.9008",25000000.0,"PA","000000820","","13010565"],["P","2026-07-31","CARIOCA CHRISTIANI NIELSEN ENGENHARIA S A","CARIOCA_DITRIBUICAO ANTECIPADA  LUCROS","2.9008",25000000.0,"PA","000000821","","13010565"],["P","2026-07-31","BELOV OBRAS PORTUARIAS LTDA","BEOP_DITRIBUICAO ANTECIPADA  LUCROS","2.9008",25000000.0,"PA","000000822","","13010565"],["P","2026-07-31","","APLICACAO CONTAMAX","9.01011",100.0,"","","","13010565"],["P","2026-07-31","","APLICACAO CDB","9.01013",30015094.03,"","","","13010565"],["P","2026-07-31","","APLICACAO COMPROMISSADA","9.01012",30015903.2,"","","","13010565"],["P","2026-08-03","DESPESA BANCARIA","DESPESA BANCARIA","2.1001",27.0,"","","","13010565"],["P","2026-08-10","VALTER LUIS DE ANDRADE SANTOS - ME","VALOR PAGO S/ TITULO","2.0123",390.0,"NF","000001447","","13010565"],["P","2026-08-10","JUNTO SEGUROS S.A.","PGT_SEG_GARAN_ADIANT_PGTO_TECO","2.0605",68366.42,"NF","030205745","A","13010565"],["P","2026-08-10","","APLICACAO CONTAMAX","9.01011",1855.27,"","","","13010565"],["P","2026-08-11","DESPESA BANCARIA","DESPESA BANCARIA","2.1001",2.0,"","","","13010565"],["P","2026-08-17","SH BRASIL SERVICOS MEDICOS LTDA","EXMAES_OCPUPACIONAIS","2.0210",850.0,"NF","000016334","","13010565"],["P","2026-08-17","ALEMAO ARTS 23 LTDA","PLACAS_CISD","2.0905",520.0,"NF","000000635","","13010565"],["P","2026-08-17","","APLICACAO CONTAMAX","9.01011",103200.85,"","","","13010565"],["P","2026-08-19","ADILIO SILVA SANTOS","ADT ADILIO MOBILIZACAO","2.1008",10000.0,"PA","000000819","","13010565"],["P","2026-08-19","GEOSEA INVESTIGACOES GEOTECNICAS LTDA","MOB_DESB_EQUIPA_PESSOAL","2.0617",100262.4,"NF","000000045","1","13010565"],["P","2026-08-19","DESPESA BANCARIA","DESPESA BANCARIA","2.1001",9.0,"","","","13010565"],["P","2026-08-20","DESPESA BANCARIA","DESPESA BANCARIA","2.1001",18.0,"","","","13010565"],["P","2026-08-24","METROPASSE-ASSOCIACAO BAHIA DE TRANSPORTES METROPOLITANOS","METROPASSE CONSORCIO 202609","2.0207",1086.8,"NF","002474071","1","13010565"],["P","2026-08-24","METROPASSE-ASSOCIACAO BAHIA DE TRANSPORTES METROPOLITANOS","METROPASSE CONSORCIO 202609","2.0207",57.2,"NF","002474071","2","13010565"],["P","2026-08-24","CONSORCIO SALVADOR TRANSCARD DE BILHETAGEM AUTOMATICA","VT SSACARD CSD 202609","2.0207",5192.0,"NF","008317528","","13010565"],["P","2026-08-24","RAIMUNDO DE OLIVEIRA CARDOSO","ADT CAUCAO IMOVEL ENGENHARIA","2.1015",15000.0,"PA","000000824","","13010565"],["P","2026-08-25","DESPESA BANCARIA","DESPESA BANCARIA","2.1001",9.0,"","","","13010565"],["P","2026-08-26","DESPESA BANCARIA","TARIFA MENSAL MANUN CONTA-DESPESAS BANCA","2.1001",99.0,"","","","13010565"],["P","2026-08-26","","APLICACAO CONTAMAX","9.01011",85208.14,"","","","13010565"],["P","2026-08-27","RAIMUNDO SANTANA ROCHA JUNIOR","REEMB_RAIMUNDO_BAGAGEM_FERNAND","2.1008",854.11,"NF","000286669","1","13010565"],["P","2026-08-27","RAIMUNDO SANTANA ROCHA JUNIOR","REEMB_RAIMUNDO_BAGAGEM_FERNAND","2.1008",44.95,"NF","000286669","2","13010565"],["P","2026-08-27","JUNTO SEGUROS S.A.","SEGURO_GARANT_EXE_CONSTR","2.0605",44593.55,"NF","006506464","A","13010565"],["P","2026-08-27","JUNTO SEGUROS S.A.","SEGURO_GARANTIA_RET_PAGTO","2.0605",11148.39,"NF","006506501","A","13010565"],["P","2026-08-27","THIAGO ABI RAMIA BARBOZA MARINI","REMMBOLS_THIAGO_MARINI","2.0907",646.56,"NF","020260805","","13010565"],["P","2026-08-27","MAYKON FERREIRA DA SILVA","REEMB_MAYKON_FERREIRA_SILVA","2.1008",1223.36,"NF","020260821","1","13010565"],["P","2026-08-27","MAYKON FERREIRA DA SILVA","REEMB_MAYKON_FERREIRA_SILVA","2.1008",64.39,"NF","020260821","2","13010565"],["P","2026-08-27","CREA - CONSELHO ENG ARQ E AGRO","02OBR00326 REGISTRO DO CREA","2.0920",308.4,"NF","062750122","1","13010565"],["P","2026-08-27","CREA - CONSELHO ENG ARQ E AGRO","02OBR00326 REGISTRO DO CREA","2.0920",16.23,"NF","062750122","2","13010565"],["P","2026-08-27","MARCOS VINICIUS NASCIMENTO CONCEIÇÃO","ADT CAUCAO IMOVEL ENGENHARIA","2.1015",9432.06,"PA","000000825","","13010565"],["P","2026-08-28","DESPESA BANCARIA","DESPESAS BANCARIAS","2.1001",29.0,"","","","13010565"],["P","2026-08-31","JOSETE SAMPAIO DE OLIVEIRA","ADT CAUCAO IMOVEL ENG","2.1015",15564.87,"PA","000000826","","13010565"],["P","2026-08-31","MAURO SERGIO LEITE BRENNEISEN","ADIANT CAUCAO IMOVEL ENCAREGADOS","2.1015",7059.0,"PA","000000827","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA MINERAL","2.0135",12.0,"NF","000000078","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MENERAL","2.0135",6.5,"NF","000000079","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",84.0,"NF","000000080","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",30.0,"NF","000000081","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",72.0,"NF","000000082","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA MINERAL","2.0135",169.5,"NF","000000083","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_WAHINGTON_SILVA","2.1304",1207.5,"NF","000091809","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_THIAGO_MARINI","2.1304",3622.5,"NF","000091832","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_RAFAEL_HENRIQUE","2.1304",3864.0,"NF","000091833","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_VITOR_MATOS","2.1304",3381.0,"NF","000091835","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_ANDERSON_PAIVA","2.1304",2173.5,"NF","000091836","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_MAYKON_FERREIRA","2.1304",4347.0,"NF","000091838","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_RENATO_SILVA","2.1304",4347.0,"NF","000091839","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_HEITOR_MATOS","2.1304",4588.5,"NF","000091840","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_JHON_RANDLER","2.1304",483.0,"NF","000091847","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPEDAGEM_JENECY_SOUZA","2.1304",3501.75,"NF","000091860","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",24.0,"NF","000000077","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",48.5,"NF","000000084","","13010565"],["P","2026-08-31","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL","2.0135",6.0,"NF","000000085","","13010565"],["P","2026-08-31","","APLICACAO COMPROMISSADA","9.01012",29913714.57,"","","","13010565"],["P","2026-09-01","DESPESA BANCARIA","DESPESAS BANCARIAS - SANTANDER","2.1001",8.0,"","","","13010565"],["P","2026-09-02","VALTER LUIS DE ANDRADE SANTOS - ME","VALOR PAGO S /TITULO","2.0123",455.0,"NF","000001454","","13010565"],["P","2026-09-02","MARCOS VINICIUS NASCIMENTO CONCEIÇÃO","ALUG_ENG_THIAGO_PROP_4_DIAS","2.0407",506.62,"NF","020260831","","13010565"],["P","2026-09-02","RAIMUNDO DE OLIVEIRA CARDOSO","ALUG_ENG_I_PROPORC_5_DIAS","2.0407",1072.34,"NF","020260831","","13010565"],["P","2026-09-02","JHON RANDLER DOS SANTOS BELARMINO","REEMB_REFEICAO_16/08_23/08","2.1008",440.16,"NF","020260831","1","13010565"],["P","2026-09-02","JHON RANDLER DOS SANTOS BELARMINO","REEMB_REFEICAO_16/08_23/08","2.1008",23.17,"NF","020260831","2","13010565"],["P","2026-09-02","FOLHA DE PAGAMENTO","LIQUIDO_FOPAG_CSD_202608 - COMPETAªNCIA:","2.0201",57786.06,"FOL","000000013","","13010565"],["P","2026-09-02","MUNICIPIO","ISS TERC 08/2026 CISD","2.9904",5978.68,"IMP","ISS0826","A","13010565"],["P","2026-09-02","","APLICACAO CONTAMAX","9.01011",66803.81,"","","","13010565"],["P","2026-09-03","DESPESA BANCARIA","TAR PIX PGTO FORNEC - OUTRA INST","2.1001",4.5,"","","","13010565"],["P","2026-09-04","ELAINE DA SILVA ARAUJO 02163247503","LOCACAO_IMPRESSORA","2.0401",500.0,"NF","000000449","","13010565"],["P","2026-09-04","AMERICATUR AGENCIA DE VIAGENS LTDA","TAXA_DE_FEE","2.0615",90.0,"NF","000017139","","13010565"],["P","2026-09-04","JUNTO SEGUROS S.A.","PGT_SEG_GARAN_ADIANT_PGTO_TECO","2.0605",68366.42,"NF","030205745","B","13010565"],["P","2026-09-04","CODEF COMERCIAL DE FERRAMENTAS LTDA","VALOR PAGO S /TITULO","2.0211",255.0,"NF","000227231","","13010565"],["P","2026-09-08","DESPESA BANCARIA","TAR PIX PGTO FORNEC - OUTRA INST","2.1001",1.5,"","","","13010565"],["P","2026-09-09","CASE BY CASE ENGENHARIA E MANUTENCAO LTDA","PROJETO_ESTRUT_METALICO_SONDA","2.0614",14265.2,"NF","000000303","","13010565"],["P","2026-09-09","AMERICATUR AGENCIA DE VIAGENS LTDA","PASSAGENS_AEREAS_4/08 A 14/08","2.1301",5972.3,"NF","000089366","","13010565"],["P","2026-09-09","BAHIA ESPORTE E PESCA LTDA","VALOR PAGO S /TITULO","2.0114",2690.0,"NF","000020599","","13010565"],["P","2026-09-09","ATACADAO DO PAPEL LTDA","VALOR PAGO S /TITULO","2.0707",1483.8,"NF","000400825","","13010565"],["P","2026-09-09","NAUTICA MARITIMA SERVICOS LTDA","ADT 25% CONTRATO FRENTE NAUTICA","2.0614",293125.0,"PA","000000829","","13010565"],["P","2026-09-09","ADILIO SILVA SANTOS","ADT MOBILIZACAO OBRA","2.1008",10000.0,"PA","000000830","","13010565"],["P","2026-09-09","","APLICACAO CONTAMAX","9.01011",22549.28,"","","","13010565"],["P","2026-09-10","DESPESA BANCARIA","TAR PIX PGTO FORNEC - OUTRA INST","2.1001",7.5,"","","","13010565"],["P","2026-09-11","TD SYNNEX BRASIL LTDA","ADT CONTR SERVICOS NUVEM +MICROSOFT 365","2.0905",45429.3,"PA","000000831","","13010565"],["P","2026-09-11","","APLICACAO CONTAMAX","9.01011",54654.31,"","","","13010565"],["P","2026-09-14","GARIBALDI COPIADORA LTDA","PLOTAGENS_IMPRESSOES_08/2026","2.0905",312.0,"NF","000002278","","13010565"],["P","2026-09-14","BAHIA WORKWEAR UNIFORMES LTDA","VALOR PAGO S /TITULO","2.0211",470.0,"NF","000005946","","13010565"],["P","2026-09-14","EVERTON FARIAS CARVALHO - ME","VALOR PAGO S /TITULO","2.0904",2500.0,"NF","000007453","","13010565"],["P","2026-09-14","CANEL CABOS DE ACO DO NORDESTE LTDA","VALOR PAGO S /TITULO","2.0110",5480.0,"NF","000015509","","13010565"],["P","2026-09-14","BAHIA ESPORTE E PESCA LTDA","VALOR PAGO S /TITULO","2.0118",350.0,"NF","000020669","","13010565"],["P","2026-09-14","BAHIA ESPORTE E PESCA LTDA","VALOR PAGO S /TITULO","2.0119",156.0,"NF","000020670","","13010565"],["P","2026-09-14","BAHIA ESPORTE E PESCA LTDA","VALOR PAGO S /TITULO","2.0120",396.0,"NF","000020707","","13010565"],["P","2026-09-14","FOLHA DE PAGAMENTO","ADIANTAMENTO_SALARIAL_CSD_202609 - COMPE","2.0201",73271.64,"ADI","000000027","","13010565"],["P","2026-09-14","DESPESA BANCARIA","TAR PIX PGTO FORNEC - OUTRA INST","2.1001",1.5,"","","","13010565"],["P","2026-09-14","ROSE MEIRE DE OLIVEIRA SOUSA","CAUCAO APT MESTRE, TST,SUPER TOPOGRAFIA","2.1015",8355.0,"PA","000000834","","13010565"],["P","2026-09-14","","APLICACAO CONTAMAX","9.01011",8837.83,"","","","13010565"],["P","2026-09-15","DESPESA BANCARIA","TAR PIX PGTO FORNEC - OUTRA INST","2.1001",0.4,"","","","13010565"],["P","2026-09-15","DESPESA BANCARIA","TAR EMISSAO TED CIP PGTO FORNEC","2.1001",4.8,"","","","13010565"],["P","2026-09-16","CASE BY CASE ENGENHARIA E MANUTENCAO LTDA","PLANO_RIGGING_BALSA_BARTIRA","2.0614",1679.91,"NF","000000304","","13010565"],["P","2026-09-16","27.180.988 MIGUEL MIRANDA CARDOSO","TRANSPORTE_COLETA_MATERIAIS","2.0614",500.0,"NF","000000531","","13010565"],["P","2026-09-16","VALTER LUIS DE ANDRADE SANTOS - ME","FORN. DE AGUA MINERAL","2.0123",1060.0,"NF","000001462","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","TAXA_PCMSO_ELABORACAO","2.0210",250.0,"NF","000016429","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","TAXA_PCMSO_ELABORACAO","2.0210",250.0,"NF","000016430","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","TAXA_PCMSO_ELABORACAO","2.0210",250.0,"NF","000016431","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","TAXA_PCMSO_ELABORACAO","2.0210",250.0,"NF","000016432","","13010565"],["P","2026-09-16","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERAL_RENNAN_92222","2.0123",6.0,"NF","000018061","","13010565"],["P","2026-09-16","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","AGUA_MINERA_DANIEL_ 92223","2.0123",6.0,"NF","000018062","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAME_OCUPAC_ALEXANDRE_MENDES","2.0210",371.33,"NF","000039153","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAMES_OCUP_HUMBERTO_RAIMUNDO","2.0210",487.87,"NF","000039154","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAME_OCUPAC_MAYKON_THIAGO","2.0210",742.66,"NF","000039155","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAME_OCUPAC_RAFAEL_CONCEICAO","2.0210",116.54,"NF","000039157","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAME_OCUPAC_HEITOR_WASHINFTON","2.0210",487.87,"NF","000039158","","13010565"],["P","2026-09-16","SH BRASIL SERVICOS MEDICOS LTDA","EXAME_OCUPAC_VITOR_MATOS","2.0210",116.54,"NF","000039161","","13010565"],["P","2026-09-16","ALLPARK EMPREENDIMENTOS, PARTICIPACOES E SERVICOS S.A.","ESTACIONAMENTO_MENSAL_3_VEC","2.0907",1196.34,"NF","000087357","","13010565"],["P","2026-09-16","ALLPARK EMPREENDIMENTOS, PARTICIPACOES E SERVICOS S.A.","ESTACIONAMENTO_6_VAGAS_MENSAL","2.0907",1110.0,"NF","000087628","","13010565"],["P","2026-09-16","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSPED_RENNAN_VITOR_PROFITTO","2.1304",241.5,"NF","000092222","","13010565"],["P","2026-09-16","EXPRESS EMPREENDIMENTOS HOTELEIROS LTDA","HOSP_DANIEL_LIMA_PROFITTO","2.1304",241.5,"NF","000092223","","13010565"],["P","2026-09-16","IRMAS VALENTIM UNIFORMES LTDA","FARDAS PARA USO EM OBRA","2.0211",2220.0,"NF","000005416","","13010565"],["P","2026-09-16","ATACADAO DO PAPEL EIRELI","TECLADO/MOUSE PARA USO EM OBRA","2.0707",977.5,"NF","000078398","","13010565"],["P","2026-09-16","CODEF COMERCIAL DE FERRAMENTAS LTDA","EPI`S PARA USO EM OBRA - PERNE","2.0211",488.1,"NF","000227628","","13010565"],["P","2026-09-16","CODEF COMERCIAL DE FERRAMENTAS LTDA","VALOR PAGO S /TITULO","2.0120",386.13,"NF","000227713","","13010565"],["P","2026-09-16","CODEF COMERCIAL DE FERRAMENTAS LTDA","VALOR PAGO S /TITULO","2.0119",4206.85,"NF","000227772","A","13010565"],["P","2026-09-16","FGTS MENSAL - FOPAG","FGTS_CSD_202608","2.0203",5344.86,"FGT","000000038","","13010565"],["P","2026-09-16","PREVIDENCIA SOCIAL","INSS CSD 202608","2.0203",24788.96,"FOL","000000001","","13010565"],["P","2026-09-16","UNIAO - IRRF TERCEIROS PESSOA JURIDICA","IRRF FOL- 202608","2.0203",5768.86,"IRF","000000035","","13010565"],["P","2026-09-16","UNIAO","IRRF TERCEIROS 08/2026","2.9903",1793.6,"IMP","17080826","A","13010565"],["P","2026-09-16","UNIAO","CSRF 08/2026","2.9901",5560.18,"IMP","59520826","A","13010565"],["P","2026-09-16","DEVOLUÇÃO BEOP","DEV ATIVACAO CONTA-BEOP","2.1008",10.0,"","","","13010565"],["P","2026-09-16","BELOV OBRAS PORTUARIAS LTDA","ATIVACAO CTA REIDI - VLR A DEVOLVER","2.1008",5.0,"PA","000000835","","13010565"],["P","2026-09-16","","16092026/TRANSF MESMA TITULARIDADE BCO SANTANDER","9.0101",5.0,"","","","13010565"]],IV0=[["R","2026-07-31","CONTAMAX","APLICACAO CONTAMAX","9.0102",100.0,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-07-31","CONTAMAX","APLIC CONTAMAX","9.0102",100.0,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-07-31","CDB","APLICACAO CDB","9.0102",30015094.03,"INV","","","130105650","Aplicação","ap","CDB"],["R","2026-07-31","COMPROMISSADA","APLICACAO COMPROMISSADAS","9.0102",30015903.2,"INV","","","1301056500","Aplicação","ap","COMPROMISSADA"],["R","2026-08-10","CONTAMAX","APLICACAO CONTAMAX","9.0102",1855.27,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-08-17","CONTAMAX","APLICACAO CONTAMAX","9.0102",103200.85,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-08-26","CONTAMAX","APLICACAO CONTAMAX","9.0102",85208.14,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-08-31","CDB","RENDIMENTO RECEBIDO","1.0301",329191.14,"INV","","","130105650","Rendimento","rd","CDB"],["R","2026-08-31","COMPROMISSADA","APLICACAO COMPROMISSADA","9.0102",29913714.57,"INV","","","1301056500","Aplicação","ap","COMPROMISSADA"],["R","2026-08-31","COMPROMISSADA","RENDIMENTO RECEBIDO","1.0301",294196.51,"INV","","","1301056500","Rendimento","rd","COMPROMISSADA"],["R","2026-09-02","CONTAMAX","TB - APLICACAO CONTAMAX","9.0102",66803.81,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-09-09","CONTAMAX","APLICACAO CONTAMAX","9.0102",22549.28,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-09-11","CONTAMAX","APLICACAO CONTAMAX","9.0102",54654.31,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-09-14","CONTAMAX","APLICACAO CONTAMAX","9.0102",8837.83,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["R","2026-09-14","CONTAMAX","APLICACAO CONTAMAX","9.0102",8837.83,"INV","","","013010565","Aplicação","ap","CONTAMAX"],["P","2026-08-03","CONTAMAX","260803/RESGATE CONTAMAX","9.0101",27.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-03","COMPROMISSADA","260810/RESGATE COMPROMISSADAS","9.0101",70611.69,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-10","COMPROMISSADA","260810/RESGATE COMPROMISSADAS","9.0101",70611.69,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-11","CONTAMAX","260811/RESGATE CONTAMAX","9.0101",2.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-17","COMPROMISSADA","260817/RESGATE COMPROMISSADAS","9.0101",104570.85,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-19","CONTAMAX","260819/RESGATE CONTAMAX","9.0101",100011.95,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-19","COMPROMISSADA","260819/RESGATE COMPROMISSADAS","9.0101",10259.45,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-20","CONTAMAX","260820/RESGATE CONTAMAX","9.0101",18.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-24","CONTAMAX","260824/RESGATE CONTAMAX","9.0101",794.89,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-24","COMPROMISSADA","260824/RESGATE COMPROMISSADAS","9.0101",20541.11,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-25","CONTAMAX","260825/RESGATE CONTAMAX","9.0101",9.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-26","COMPROMISSADA","260826/RESGATE COMPROMISSADAS","9.0101",85307.14,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-27","CONTAMAX","260827/RESGATE CONTAMAX","9.0101",68332.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-27","COMPROMISSADA","260827/RESGATE COMPROMISSADAS","9.0101",68332.0,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-08-28","CONTAMAX","260828/RESGATE AUTOMATICO","9.0101",27.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-28","CONTAMAX","260828/RESGATE CONTAMAX","9.0101",29.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-31","CONTAMAX","260831/RESGATE AUTOMATICO","9.0101",15691.4,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-08-31","COMPROMISSADA","IR S/ RESGATE APLICACOES","2.9905",66194.18,"INV","","","1301056500","IR sobre resgate","ir","COMPROMISSADA"],["P","2026-08-31","COMPROMISSADA","260831/VENCIMENTO COMPROMISSADAS-RESGATE","9.0101",29952615.29,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-09-01","CONTAMAX","01092026/TB - RESGATE CONTAMAX AUTOMATICO","9.0101",8.0,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-02","COMPROMISSADA","260902/RESGATE COMPROMISSADAS","9.0101",133065.84,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-09-03","CONTAMAX","03092026/RESGATE CONTAMAX AUTOMATICO","9.0101",4.5,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-04","CONTAMAX","04092026/RESGATE CONTAMAX AUTOMATICO","9.0101",69211.42,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-08","CONTAMAX","08092026/RESGATE CONTAMAX AUTOMATICO","9.0101",1.5,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-09","COMPROMISSADA","260909/RESGATE COMPRMISSADAS","9.0101",350085.58,"INV","","","1301056500","Resgate","rs","COMPROMISSADA"],["P","2026-09-10","CONTAMAX","10092026/RESGATE CONTAMAX AUTOMATICO","9.0101",7.5,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-11","COMPROMISSADA","11092026/RESGATE DE COMPROMISSADA","9.0101",100083.61,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-14","COMPROMISSADA","14092026/RESGATE DE COMPROMISSADA","9.0101",100028.77,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-14","CONTAMAX","14092026/APLICACAO CONTAMAX","9.0101",8837.83,"INV","","","130105650","Resgate","rs","CDB"],["P","2026-09-15","CONTAMAX","15092026/RESGATE CONTAMAX AUTOMATICO","9.0101",5.2,"INV","","","013010565","Resgate","rs","CONTAMAX"],["P","2026-09-16","CONTAMAX","16092026/RESGATE CONTAMAX AUTOMATICO","9.0101",60919.1,"INV","","","013010565","Resgate","rs","CONTAMAX"]],CTA=[{"c":"13010565","b":"033","a":"3324","n":"","k":"Principal"},{"c":"13010587","b":"033","a":"3324","n":"","k":"Fundo Reserva"},{"c":"13010584","b":"033","a":"3324","n":"","k":"Beop"}],R=[],IV=[],CT='',CTP='',SKS=[],MT={},CH={},tab='exe',Y='',M='',FQ='',FC='',FS='',MSG='',OPEN={},EX={ent:1,sai:1,tr:1,p_TOTAL:1},SK='v',SD=1,DRL=[],KEYS=[],DCUR=null,TBL=[];
+ /* linha: [origem R/P, data, nome, histórico, natureza, valor, tipo(TP), título, parcela, conta]
+    linha de INVESTIMENTO (IV): R=entra no produto (aplicação/rendimento), P=sai (resgate/IR); [..., conta, rótulo, tipo(ap|rs|rd|ir), produto pela conta] */
+ try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.r&&s.r.length){RA=s.r;PL=s.p||PL;PX=s.x||PX;IV0=s.i||[];CTA=s.c&&s.c.length?s.c:CTA}}catch(e){}
+ const $$=id=>document.getElementById(id),mes=d=>d.slice(0,7),lab=m=>MN[+m.slice(5)-1]+'/'+m.slice(0,4),brd=d=>d.split('-').reverse().join('/'),
+  z=n=>Math.abs(+n||0)<.005?0:+n,fm=n=>z(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}),fr=n=>z(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),
+  mi=n=>Math.abs(n)>=1e6?(n/1e6).toFixed(2).replace('.',',')+' Mi':(+n||0).toLocaleString('pt-BR',{maximumFractionDigits:0}),sum=(a,k)=>a.reduce((t,x)=>t+x[k],0),
+  esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
+  nc=v=>String(v==null?'':v).replace(/\D/g,'').replace(/^0+/,''),ivc=r=>nc(r[9]).startsWith(CT),
+  flt=()=>{R=CT?RA.filter(r=>r[9]==CT):RA.slice();IV=CT?IV0.filter(ivc):IV0.slice()},
+  PR=['CDB','COMPROMISSADA','CONTAMAX'],PC={CDB:'#1565c0',COMPROMISSADA:'#2e7d32',CONTAMAX:'#f9a825'},
+  og=r=>r[10]?(r[0]=='R'?'Entrada':'Saída')+' (invest.)':r[0]=='R'?'Receber':'Pagar',
+  cat=r=>r[10]||PL[r[4]]||'Sem categoria',nome=r=>r[2]||r[3]||'(sem descrição)',sv=r=>r[0]=='R'?r[5]:-r[5],
+  isTr=r=>cat(r).startsWith('Transfer'),
+  /* Classe do fluxo: investimentos e (só se o Plano de Naturezas disser 'Transferências') transferências ficam fora; o resto segue a origem Receber=Entrada / Pagar=Saída.
+     Com 'CATEGORIA FLUXO DE CAIXA' = Entrada/Saídas para Transferência de Entrada/Saída, elas contam como Entrada e Saída. */
+  cls=r=>{const c=cat(r),f=PX[r[4]];return INV.includes(c)||f=='Investimentos'?'inv':(f?f=='Transferências':c.startsWith('Transfer'))?'tr':r[0]=='R'?'ent':'sai'},
+  NOFOR=r=>cat(r)=='Distribuição Antecipada'||r[4]=='2.9008'||isTr(r),FOR=r=>cls(r)=='sai'&&!NOFOR(r),specF=(t,f,s)=>(DRL.push({t,f,s}),DRL.length-1),src=s=>s=='I'?IV:R,K=s=>(KEYS.push(s),KEYS.length-1),neg=v=>z(v)<0?' text-rose-600':'';
+ /* série mensal acumulada (independe dos filtros) */
+ function posAt(m){const o={CDB:0,COMPROMISSADA:0,CONTAMAX:0};IV.forEach(r=>{if(mes(r[1])<=m)o[r[2]]=(o[r[2]]||0)+sv(r)});return o}
+ function serie(){const by={};IV.forEach(r=>{by[mes(r[1])]??={ent:0,sai:0,inv:0,tr:0}});R.forEach(r=>{const m=mes(r[1]),k=cls(r),b=by[m]??={ent:0,sai:0,inv:0,tr:0};
+   if(k=='ent'||k=='sai')b[k]+=r[5];else if(k=='inv')b.inv+=r[0]=='P'?r[5]:-r[5];else b.tr+=r[0]=='R'?r[5]:-r[5]});
+  let si=0,pos=0;return Object.keys(by).sort().map(m=>{const b=by[m];pos+=b.inv;const sf=si+b.ent-b.sai-b.inv+b.tr,o={m,si,ent:b.ent,sai:b.sai,inv:IV.length?Object.values(posAt(m)).reduce((t,v)=>t+v,0):pos,sf,dinv:b.inv,tr:b.tr};si=sf;return o})}
+ const scope=()=>serie().filter(x=>(!Y||x.m.startsWith(Y))&&(!M||x.m.slice(5)==M)),inS=(r,ms)=>ms.includes(mes(r[1])),
+  maxD=()=>R.concat(IV).reduce((t,r)=>r[1]>t?r[1]:t,'');
+ function kpis(){const s=scope();if(!s.length)return null;const l=s[s.length-1];return{si:s[0].si,ent:sum(s,'ent'),sai:sum(s,'sai'),inv:l.inv,sf:l.sf}}
+ const grp=(a,f,v)=>{const o={};a.forEach(r=>{const k=f(r);o[k]=(o[k]||0)+v(r)});return Object.entries(o).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1]))};
+ function posInv(){const s=scope();if(!s.length)return[];const fim=s[s.length-1].m;if(IV.length)return grp(IV.filter(r=>mes(r[1])<=fim),nome,sv).filter(x=>Math.abs(x[1])>.005);return grp(R.filter(r=>cls(r)=='inv'&&mes(r[1])<=fim),cat,r=>r[0]=='P'?r[5]:-r[5]).filter(x=>Math.abs(x[1])>.005)}
+ const cor=()=>document.documentElement.classList.contains('dark')?'#cbd5e1':'#334155',G='#2e7d32',V='#c62828';
+ function mk(id,cfg){const c=$$(id);if(!c)return;if(CH[id])CH[id].destroy();CH[id]=new Chart(c,cfg)}
+ const dl=(f,sz)=>({display:true,color:cor(),font:{size:sz||10,weight:'bold'},formatter:f||(v=>mi(v)),anchor:'end',align:'end',clip:false}),
+  hov=(e,els)=>{if(e&&e.native&&e.native.target)e.native.target.style.cursor=els.length?'pointer':'default'},
+  baseO=(o={})=>({responsive:true,maintainAspectRatio:false,onHover:hov,...o,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:c=>' '+fr(c.raw)}},...(o.plugins||{})}});
+ const kp=(t,v,c,i)=>i==null?`<div class="card text-center"><div class="text-xs text-slate-500">${t}</div><div class="text-xl font-bold mt-1 ${c||''}">${v}</div></div>`:
+  `<button class="card text-center cursor-pointer hover:ring-2 hover:ring-indigo-500 transition" title="Clique para ver os lançamentos" onclick="dash.dr(${i})"><div class="text-xs text-slate-500">${t} ↗︎</div><div class="text-xl font-bold mt-1 ${c||''}">${v}</div></button>`;
+ const tbl=(h,b,st)=>`<div ${st?'style="max-height:520px;overflow:auto"':'class="overflow-x-auto"'}><table class="w-full text-sm"><thead class="text-xs uppercase text-slate-500 text-left ${st?'sticky top-0 bg-white dark:bg-slate-900':''}"><tr>${h}</tr></thead><tbody>${b}</tbody></table></div>`;
+ const fi=v=>Math.round(+v||0).toLocaleString('pt-BR'),NG={grid:{display:false},border:{display:false}},
+  bar=(a,col,n,oc,sel,full,sz)=>({type:'bar',data:{labels:a.slice(0,n).map(x=>x[0]),datasets:[{data:a.slice(0,n).map(x=>Math.abs(x[1])),backgroundColor:a.slice(0,n).map(x=>sel&&x[0]!=sel?col+'55':col)}]},
+  options:baseO({indexAxis:'y',layout:{padding:{right:full?(sz&&sz<12?85:125):70}},onClick:(e,els)=>{if(els.length&&oc)oc(a[els[0].index][0])},plugins:{datalabels:dl(full?fi:undefined,sz||(full?13:10))},scales:{x:{display:false,...NG},y:{...NG,ticks:{font:{size:10},callback(v){const l=String(this.getLabelForValue(v));return l.length>30?l.slice(0,29)+'…':l}}}}})});
+ const per=s=>s.length==1?lab(s[0].m):'ano '+Y;
+ /* ---------- cabeçalho ---------- */
+ const allM=()=>[...new Set(RA.concat(IV0).map(r=>mes(r[1])))].sort(),
+  CY=String(new Date().getFullYear()),
+  dM=()=>{const m=allM().filter(x=>x.startsWith(Y));return tab=='exe'||tab=='for'?'':(m[m.length-1]||'').slice(5)},
+  lastPer=()=>{const m=allM(),ys=[...new Set(m.map(x=>x.slice(0,4)))];Y=ys.includes(CY)?CY:(ys[ys.length-1]||'');MT={};M=dM()},
+  DK=['Principal','Fundo Reserva','Beop'],
+  ctl=c=>{const a=CTA.find(x=>x.c==c);return c+(a&&a.k?' - '+a.k:'')},
+  cn=c=>{const a=CTA.find(x=>x.c==c);return a&&a.n?a.n:(c||'conta não identificada')},
+  trLab=r=>{const o=RA.find(x=>isTr(x)&&x[0]!=r[0]&&x[1]==r[1]&&x[5]==r[5]&&x[9]!=r[9]);return (r[0]=='P'?'Para: ':'De: ')+(o?ctl(o[9]):'conta não identificada')},
+  BK={'033':'Santander','001':'Banco do Brasil','237':'Bradesco','341':'Itaú','104':'Caixa','260':'Nubank','077':'Inter'},
+  ctaTxt=()=>{const a=CTA.find(x=>x.c==CT);return a?'<b>Conta '+a.c+(a.n?' · '+esc(a.n):'')+'</b> · '+(BK[a.b]||'Banco '+a.b)+' ag. '+a.a+(a==CTA[0]?' (principal)':''):'<b>Todas as contas</b>'};
+ function head(){const ms=allM(),ys=[...new Set(ms.map(m=>m.slice(0,4)))];if(!Y||!ys.includes(Y))Y=ys[ys.length-1]||'';
+  const mo=ms.filter(m=>m.startsWith(Y));
+  return `<div class="flex flex-wrap items-center gap-2"><div class="mr-auto"><h1 class="text-2xl font-bold leading-tight">Dashboard · Fluxo de Caixa</h1><p class="text-sm text-slate-500">Realizado · atualizado até a data-base: <b>${R.length||IV.length?brd(maxD()):'—'}</b> · ${ctaTxt()}</p></div>
+  ${tab=='sal'?'':`<label class="text-xs text-slate-500">Conta <select class="inp ml-1" title="Conta bancária usada como parâmetro" onchange="dash.f('CT',this.value)">${CTA.map((a,i)=>`<option value="${a.c}" ${a.c==CT?'selected':''}>${a.c}${a.n?' · '+esc(a.n):''}${a.k?' · '+esc(a.k):i==0?' · principal':''}</option>`).join('')}<option value="" ${CT?'':'selected'}>Todas as contas</option></select></label>`}
+  <label class="text-xs text-slate-500">Ano <select class="inp ml-1" onchange="dash.f('Y',this.value)">${ys.map(y=>`<option ${y==Y?'selected':''}>${y}</option>`).join('')}</select></label>
+  <label class="text-xs text-slate-500">Mês <select class="inp ml-1" onchange="dash.f('M',this.value)"><option value="">Todos</option>${mo.map(m=>`<option value="${m.slice(5)}" ${m.slice(5)==M?'selected':''}>${lab(m)}</option>`).join('')}</select></label>
+  <button class="btn2 adm" title="Importa a planilha que está em dados/dashboard no repositório" onclick="dash.pasta()">Importar da pasta</button><button class="btn2 adm" onclick="document.getElementById('dash-fi').click()">⬆ Upload</button><input id="dash-fi" type="file" accept=".xlsx,.xls" class="hidden" onchange="dash.up(this)"><button class="btn2" onclick="dash.xl()">Excel</button></div>
+  ${MSG?`<div class="text-sm rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-2">${esc(MSG)}</div>`:''}
+  <div class="flex flex-wrap gap-2">${[['exe','📊','Visão executiva'],['sal','🏦','Saldos'],['for','🧾','Saída · Fornecedores']].map(t=>`<button class="${tab==t[0]?'btn':'btn2'}" onclick="dash.t('${t[0]}')"><span class="mr-1">${t[1]}</span>${t[2]}</button>`).join('')}</div>`}
+ /* ---------- Visão executiva ---------- */
+ function exe(){const k=kpis(),s=scope();if(!k)return '<div class="card">Sem dados no período.</div>';DRL=[];KEYS=[];
+  const ms=s.map(x=>x.m),last=ms[ms.length-1],P=per(s),ent=grp(R.filter(r=>cls(r)=='ent'&&inS(r,ms)),nome,r=>r[5]);
+  const dI=IV.length?specF('Aplicado (líquido de IR) · movimentação até '+lab(last),r=>mes(r[1])<=last,'I'):specF('Investimentos · movimentação até '+lab(last),r=>cls(r)=='inv'&&mes(r[1])<=last);
+  const cell=(i,v,b)=>z(v)==0?`<td class="px-2 py-1.5 text-right ${b?'font-bold':''}">0,00</td>`:`<td class="px-2 py-1.5 text-right cursor-pointer hover:bg-indigo-500/10 ${b?'font-bold':''}${neg(v)}" onclick="event.stopPropagation();dash.dr(${i})">${fm(v)}</td>`;
+  const tl=r=>isTr(r)?cat(r)+' · '+trLab(r):cat(r),
+  blk=(t,cl,sg,key,lf)=>{const gc=r=>lf?lf(r):cat(r),o={};R.filter(r=>cls(r)==cl&&inS(r,ms)).forEach(r=>{const c=gc(r),b=o[c]??={},m=mes(r[1]);b[m]=(b[m]||0)+sg(r)});
+   const cs=Object.keys(o).sort((a,b)=>a.localeCompare(b,'pt')),tot=ms.map(m=>cs.reduce((a,c)=>a+(o[c][m]||0),0));
+   let h=`<tr class="bg-slate-100 dark:bg-slate-800 font-bold cursor-pointer" onclick="dash.x('${key}')"><td class="px-2 py-1.5 whitespace-nowrap">${EX[key]?'▾':'▸'} ${t}</td>${tot.map((v,j)=>cell(specF(t+' · '+lab(ms[j]),r=>cls(r)==cl&&mes(r[1])==ms[j]),v,1)).join('')}${cell(specF(t+' · '+P,r=>cls(r)==cl&&inS(r,ms)),tot.reduce((a,v)=>a+v,0),1)}</tr>`;
+   if(EX[key])h+=cs.map(c=>`<tr class="border-t border-slate-200 dark:border-slate-800"><td class="px-2 py-1.5 pl-7 cursor-pointer hover:underline" onclick="dash.dr(${specF(c+' · '+P,r=>cls(r)==cl&&gc(r)==c&&inS(r,ms))})">${esc(c)}</td>${ms.map(m=>cell(specF(c+' · '+lab(m),r=>cls(r)==cl&&gc(r)==c&&mes(r[1])==m),o[c][m]||0)).join('')}${cell(specF(c+' · '+P,r=>cls(r)==cl&&gc(r)==c&&inS(r,ms)),ms.reduce((a,m)=>a+(o[c][m]||0),0))}</tr>`).join('');return h};
+  const hd='<th class="px-2 py-1.5">TIPO</th>'+ms.map(m=>`<th class="px-2 py-1.5 text-right cursor-pointer hover:text-indigo-500 ${M&&m.slice(5)==M?'text-indigo-500':''}" title="Clique para filtrar o mês" onclick="dash.f('M','${m.slice(5)}')">${lab(m).toUpperCase()}</th>`).join('')+'<th class="px-2 py-1.5 text-right">TOTAL</th>';
+  const sfl=`<tr class="border-t-2 border-slate-400 font-bold"><td class="px-2 py-1.5">SALDO FINAL</td>${s.map(x=>cell(specF('Movimentação · '+lab(x.m)+' (todas as classes)',r=>mes(r[1])==x.m),x.sf,1)).join('')}${cell(specF('Movimentação · '+P+' (todas as classes)',r=>inS(r,ms)),k.sf,1)}</tr>`;
+  setTimeout(()=>{
+   mk('dc1',{type:'bar',data:{labels:s.map(x=>lab(x.m)),datasets:[{label:'Entradas',data:s.map(x=>x.ent),backgroundColor:G},{label:'Saídas',data:s.map(x=>x.sai),backgroundColor:V},...(s.some(x=>x.tr)?[{label:'Transferências',data:s.map(x=>x.tr),backgroundColor:'#f9a825',datalabels:{display:c=>c.dataset.data[c.dataIndex]!=0}}]:[])]},
+    options:baseO({layout:{padding:{top:20}},onClick:(e,els)=>{if(!els.length)return;const m=ms[els[0].index],d=els[0].datasetIndex,k=['ent','sai','tr'][d];dash.o2(['Entradas · ','Saídas · ','Transferências entre contas · '][d]+lab(m),r=>cls(r)==k&&mes(r[1])==m)},plugins:{legend:{display:true,position:'top',align:'start',labels:{color:cor(),font:{size:10},boxWidth:10,boxHeight:10,padding:8}},datalabels:dl()},scales:{x:{...NG},y:{display:false,grace:'20%',...NG}}})});
+   mk('dc2',{type:'line',data:{labels:s.map(x=>lab(x.m)),datasets:[{data:s.map(x=>x.inv),borderColor:G,backgroundColor:'rgba(46,125,50,.35)',fill:true,tension:.3,pointRadius:5,pointHoverRadius:8}]},
+    options:baseO({layout:{padding:{top:22,right:20}},onClick:(e,els)=>{if(!els.length)return;const m=ms[els[0].index];IV.length?dash.o2('Aplicado (líquido de IR) · movimentação até '+lab(m),r=>mes(r[1])<=m,'I'):dash.o2('Investimentos · movimentação até '+lab(m),r=>cls(r)=='inv'&&mes(r[1])<=m)},plugins:{datalabels:{...dl(),align:'top'}},scales:{x:{...NG},y:{display:false,...NG}}})});
+   mk('dc3',bar(posInv(),G,8,c=>IV.length?dash.o2('Investimento · '+c+' (até '+lab(last)+')',r=>r[2]==c&&mes(r[1])<=last,'I'):dash.o2('Investimento · '+c+' (até '+lab(last)+')',r=>cls(r)=='inv'&&cat(r)==c&&mes(r[1])<=last),null,true));
+   mk('dc4',bar(ent,G,8,n=>dash.o2('Entradas · '+n,r=>cls(r)=='ent'&&nome(r)==n&&inS(r,ms)),null,true))},0);
+  return `<section class="grid grid-cols-2 lg:grid-cols-5 gap-3">${kp('Saldo Inicial',fr(k.si))}${kp('Entradas',fr(k.ent),'text-emerald-600',specF('Entradas · '+P,r=>cls(r)=='ent'&&inS(r,ms)))}${kp('Saídas',fr(-k.sai),'text-rose-600',specF('Saídas · '+P,r=>cls(r)=='sai'&&inS(r,ms)))}${kp(IV.length?'Aplicado (líq. de IR)':'Disponível Aplicado',fr(k.inv),'text-emerald-600',dI)}${kp('Saldo Final',fr(k.sf))}</section>
+  <section class="grid lg:grid-cols-2 gap-4"><div class="card"><h2 class="font-semibold mb-2">Entradas e Saídas <span class="text-xs font-normal text-slate-500">· clique numa barra</span></h2><div class="relative h-72"><canvas id="dc1"></canvas></div></div><div class="card"><h2 class="font-semibold mb-2">Saldo Acumulado <span class="text-xs font-normal text-slate-500">· detalhe na aba Saldos</span></h2><div class="relative h-72"><canvas id="dc2"></canvas></div></div></section>
+  <section class="grid lg:grid-cols-3 gap-4"><div class="card lg:col-span-2"><h2 class="font-semibold mb-2">Fluxo de caixa <span class="text-xs font-normal text-slate-500">· clique em uma categoria ou valor para ver os lançamentos</span></h2>${tbl(hd,blk('ENTRADA','ent',r=>r[5],'ent',tl)+blk('SAÍDAS','sai',r=>-r[5],'sai',tl)+(R.some(r=>cls(r)=='tr')?blk('TRANSFERÊNCIAS ENTRE CONTAS','tr',sv,'tr',trLab):'')+sfl)}</div>
+   <div class="space-y-4"><div class="card"><h2 class="font-semibold mb-2">Posição dos investimentos <span class="text-xs font-normal text-slate-500">· líquida de IR</span></h2><div class="relative h-44"><canvas id="dc3"></canvas></div></div><div class="card"><h2 class="font-semibold mb-2">Entradas</h2><div class="relative h-44"><canvas id="dc4"></canvas></div></div></div></section>
+  `}
+ /* ---------- Saldos (conta + investimentos) ---------- */
+ function ivSerie(){const all=[...new Set(IV.map(r=>mes(r[1])).concat(R.map(r=>mes(r[1]))))].sort(),o={};
+  PR.concat(['TOTAL']).forEach(p=>{let si=0;o[p]=all.map(m=>{const b={m,si,ap:0,rs:0,rd:0,ir:0};IV.forEach(r=>{if(mes(r[1])==m&&(p=='TOTAL'||r[2]==p))b[r[11]]+=r[5]});b.sf=si+b.ap+b.rd-b.rs-b.ir;si=b.sf;return b})});return o}
+ const confer=()=>{const g={},dup=[],mm=IV.filter(r=>r[12]&&r[12]!=r[2]);IV.forEach(r=>{const k=[r[2],r[11],r[5],N(r[3])].join('|');(g[k]??=[]).push(r)});Object.values(g).forEach(a=>{if(a.length>1)dup.push(...a)});return{dup,mm}};
+function sal(){const sc=scope();if(!sc.length)return '<div class="card">Sem dados no período.</div>';DRL=[];KEYS=[];SKS=[];
+  const ms=sc.map(x=>x.m),first=ms[0],last=ms[ms.length-1],upto=r=>mes(r[1])<=last,inP=r=>ms.includes(mes(r[1])),bef=r=>mes(r[1])<first,P=per(sc),
+   dmax=a=>a.reduce((t,r)=>r[1]>t?r[1]:t,''),db=brd(dmax(RA.concat(IV0).filter(upto))),sm=(a,f)=>a.reduce((t,r)=>t+f(r),0),
+   cell=(i,v,b)=>z(v)==0?`<td class="px-2 py-1.5 text-right ${b?'font-bold':''}">0,00</td>`:`<td class="px-2 py-1.5 text-right cursor-pointer hover:bg-indigo-500/10 ${b?'font-bold':''}${neg(v)}" onclick="event.stopPropagation();dash.dr(${i})">${fm(v)}</td>`,
+   vz='<td class="px-2 py-1.5"></td>',
+   acts=a=>{const mc=r=>r[9]==a.c,mi_=r=>nc(r[9]).startsWith(a.c),rr=RA.filter(r=>mc(r)&&upto(r)),ii=IV0.filter(r=>mi_(r)&&upto(r)),rp=rr.filter(inP),G=[];
+    const byC=(pd,t,id,lf)=>{const rs=rp.filter(pd);if(!rs.length)return;const o={};rs.forEach(r=>{const c=lf?lf(r):cat(r);o[c]=(o[c]||0)+sv(r)});
+     G.push({id,t,col:'c',v:sm(rs,sv),f:r=>mc(r)&&inP(r)&&pd(r),it:Object.keys(o).sort((x,y)=>x.localeCompare(y,'pt')).map(c=>({t:c,v:o[c],f:r=>mc(r)&&inP(r)&&pd(r)&&(lf?lf(r):cat(r))==c}))})};
+    /* conta de destino/origem da transferência: lançamento oposto, mesma data e valor, em outra conta */
+    const lt=trLab;
+    byC(r=>cls(r)=='ent'&&!isTr(r),'Entradas','ent');byC(r=>cls(r)=='sai'&&!isTr(r),'Saídas','sai');byC(r=>cls(r)=='inv','Aplicação','inv');byC(isTr,'Transferências entre contas','tr',lt);
+    if(ii.length){const o={};ii.forEach(r=>{o[r[2]]=(o[r[2]]||0)+sv(r)});
+     G.push({id:'iv',t:'Saldo no Investimento',col:'a',v:sm(ii,sv),f:r=>mi_(r)&&upto(r),it:PR.filter(p=>o[p]!=null).map(p=>({t:p,v:o[p],f:r=>mi_(r)&&upto(r)&&r[2]==p}))})}
+    return{G,mc,mi_,cc:sm(rr,sv),ap:sm(ii,sv),ci:sm(rr.filter(bef),sv),ai:sm(ii.filter(bef),sv)}};
+  let TC=0,TA=0,TI=0,TJ=0;
+  const rows=CTA.map((a,i)=>{const X=acts(a),G=X.G,cc=X.cc,ap=X.ap,k='a_'+a.c,ex=EX[k];TC+=cc;TA+=ap;TI+=X.ci;TJ+=X.ai;SKS.push(k);
+   let h=`<tr class="bg-slate-100 dark:bg-slate-800 font-bold cursor-pointer border-t border-slate-200 dark:border-slate-700" onclick="dash.x('${k}')"><td class="px-2 py-1.5 whitespace-nowrap">${ex?'▾':'▸'} ${a.c}${i==0?' ★':''}${a.n?' · '+esc(a.n):''}</td><td class="px-2 py-1.5">${a.k?`<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">${esc(a.k)}</span>`:'<span class="text-slate-400">—</span>'}</td><td class="px-2 py-1.5 font-normal whitespace-nowrap">${esc(BK[a.b]||a.b)} · ag. ${esc(a.a)} <button class="ml-2 text-xs text-indigo-500 hover:underline" title="Abrir a Visão executiva desta conta" onclick="event.stopPropagation();dash.go('${a.c}')">fluxo ↗︎</button></td>${cell(specF('Conta corrente · '+a.c+' · saldo em '+db,r=>X.mc(r)&&upto(r)),cc,1)}${cell(specF('Saldo no Investimento · conta '+a.c+' · em '+db,r=>X.mi_(r)&&upto(r),'I'),ap,1)}<td class="px-2 py-1.5 text-right${neg(cc+ap)}">${fm(cc+ap)}</td></tr>`;
+   if(ex){h+=`<tr class="border-t border-slate-200 dark:border-slate-800 text-slate-500"><td class="px-2 py-1.5 pl-7" colspan="3">Saldo inicial do período</td>${cell(specF(a.c+' · saldo inicial de '+P,r=>X.mc(r)&&bef(r)),X.ci)}${cell(specF(a.c+' · saldo inicial no investimento',r=>X.mi_(r)&&bef(r),'I'),X.ai)}${vz}</tr>`;
+    G.forEach(g=>{const gk=k+'_'+g.id,gx=EX[gk];SKS.push(gk);
+    h+=`<tr class="border-t border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" onclick="dash.x('${gk}')"><td class="px-2 py-1.5 pl-7 font-semibold" colspan="3">${gx?'▾':'▸'} ${g.t}${g.col=='c'?' · '+P:' · saldo final'}</td>${g.col=='c'?cell(specF(a.c+' · '+g.t+' · '+P,g.f),g.v):vz}${g.col=='a'?cell(specF(a.c+' · '+g.t,g.f,'I'),g.v):vz}${vz}</tr>`;
+    if(gx)h+=g.it.map(x=>`<tr class="border-t border-slate-100 dark:border-slate-800/60 text-xs"><td class="px-2 py-1 pl-12" colspan="3">${esc(x.t)}</td>${g.col=='c'?cell(specF(a.c+' · '+g.t+' · '+x.t+' · '+P,x.f),x.v):vz}${g.col=='a'?cell(specF(a.c+' · Saldo no Investimento · '+x.t,x.f,'I'),x.v):vz}${vz}</tr>`).join('')})}
+   return h}).join('');
+  const dCt=specF('Conta corrente · todas as contas · saldo em '+db,upto),dAt=specF('Saldo no Investimento · todas as contas · em '+db,upto,'I'),
+   tt=`<tr class="border-t-2 border-slate-400 font-bold"><td class="px-2 py-1.5" colspan="3">TOTAL (saldo em ${db})</td>${cell(dCt,TC,1)}${cell(dAt,TA,1)}<td class="px-2 py-1.5 text-right${neg(TC+TA)}">${fm(TC+TA)}</td></tr>`;
+  return `<section class="card"><div class="flex flex-wrap items-center gap-2 mb-2"><h2 class="font-semibold mr-auto">Contas bancárias <span class="text-xs font-normal text-slate-500">· período <b>${P}</b> · saldo em <b>${db}</b> · ★ principal · ▸ expande o que ocorreu na conta no período · clique no valor para ver os lançamentos</span></h2><button class="btn2" onclick="dash.xa(true)">Expandir tudo</button><button class="btn2" onclick="dash.xa(false)">Recolher tudo</button></div>
+   ${tbl('<th class="px-2 py-1.5">CONTA / ATIVIDADE</th><th class="px-2 py-1.5">CLASSE</th><th class="px-2 py-1.5">BANCO / AGÊNCIA</th><th class="px-2 py-1.5 text-right">CONTA CORRENTE</th><th class="px-2 py-1.5 text-right">APLICADO</th><th class="px-2 py-1.5 text-right">SALDO TOTAL</th>',rows+tt)}
+   </section>`}
+ /* ---------- Saída · Fornecedores ---------- */
+ function forn(){const ms=scope().map(x=>x.m),cs=[...new Set(R.filter(r=>FOR(r)&&inS(r,ms)).map(cat))].sort((a,b)=>a.localeCompare(b,'pt'));
+  return `<section class="grid grid-cols-2 lg:grid-cols-4 gap-3"><div id="dkp" class="contents"></div>
+   <div class="card col-span-2 flex flex-wrap items-end gap-3"><label class="text-xs text-slate-500 grow">🔎 Pesquise por fornecedor ou histórico<input id="dq" class="inp w-full mt-1" placeholder="Search" value="${esc(FQ)}" oninput="dash.q(this.value)"></label>
+    <label class="text-xs text-slate-500">Categoria Tipo<select id="dfc" class="inp w-full mt-1" onchange="dash.fv('FC',this.value,1)"><option value="">Todos</option>${cs.map(c=>`<option ${c==FC?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    <button class="btn2" onclick="dash.clr()">Limpar filtros</button></div></section> <div id="dchips" class="flex flex-wrap gap-2"></div><div id="dres" class="space-y-4"></div>`}
+ function fres(){DRL=[];KEYS=[];const s=scope(),ms=s.map(x=>x.m),base=R.filter(r=>FOR(r)&&inS(r,ms)),q=r=>!FQ||N(nome(r)+' '+r[3]).includes(N(FQ)),
+  pv=base.filter(r=>q(r)&&(!FS||nome(r)==FS)),cv=base.filter(r=>q(r)&&(!FC||cat(r)==FC)),af=pv.filter(r=>!FC||cat(r)==FC),tot=-af.reduce((t,r)=>t+r[5],0);
+  $$('dkp').innerHTML=`<button class="card text-center flex flex-col items-center justify-center cursor-pointer hover:ring-2 hover:ring-indigo-500 transition" title="Ver lançamentos" onclick="dash.o3('Saídas filtradas')"><div class="text-xs font-bold text-slate-500 tracking-wide">TOTAL SAÍDAS ↗︎</div><div class="text-3xl font-bold text-rose-600 mt-1">${fr(tot)}</div><div class="text-xs text-slate-500 mt-1">${per(s)}</div></button><div class="card text-center flex flex-col items-center justify-center"><div class="text-xs font-bold text-slate-500 tracking-wide">PAGAMENTOS (COM TÍTULO)</div><div class="text-3xl font-bold mt-1">${af.filter(r=>r[7]).length}</div><div class="text-xs text-slate-500 mt-1">lançamentos com nº de título</div></div>`;
+  $$('dchips').innerHTML=[['M',M?'Mês: '+lab(Y+'-'+M):''],['FC',FC?'Categoria: '+FC:''],['FS',FS?'Fornecedor: '+FS:''],['FQ',FQ?'Busca: '+FQ:'']].filter(x=>x[1]).map(x=>`<button class="px-2 py-1 rounded-full text-xs bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-500/30" onclick="dash.rm('${x[0]}')">${esc(x[1])} ✕</button>`).join('');
+  /* pivot CATEGORIA TIPO */
+  const ag=(rows,f)=>{const o={};rows.forEach(r=>{const k=f(r),b=o[k]??={t:0,m:{}},m=mes(r[1]);b.m[m]=(b.m[m]||0)+r[5];b.t+=r[5]});return o},ac=ag(af,cat),
+   td=(i,v)=>z(v)==0?'<td class="px-3 py-1 text-right">0,00</td>':`<td class="px-3 py-1 text-right text-rose-600 cursor-pointer hover:bg-indigo-500/10" onclick="event.stopPropagation();dash.dr(${i})">${fm(-v)}</td>`;
+  let pr=Object.keys(ac).sort((a,b)=>a.localeCompare(b,'pt')).map(c=>{const o=ac[c],op=OPEN[c],ki=K(c);
+   let h=`<tr class="border-t border-slate-200 dark:border-slate-800 ${FC==c?'bg-indigo-500/10':''}"><td class="px-3 py-1 font-semibold whitespace-nowrap"><button class="mr-1 text-slate-500" onclick="dash.ok(${ki})">${op?'⊟':'⊞'}</button><span class="cursor-pointer hover:underline" title="Clique para filtrar" onclick="dash.fk('FC',${ki})">${esc(c)}</span></td>${ms.map(m=>td(specF(c+' · '+lab(m),r=>FOR(r)&&cat(r)==c&&mes(r[1])==m&&(!FS||nome(r)==FS)),o.m[m]||0)).join('')}${td(specF(c,r=>FOR(r)&&cat(r)==c&&inS(r,ms)&&(!FS||nome(r)==FS)),o.t)}</tr>`;
+   if(op){const as=ag(pv.filter(r=>cat(r)==c),nome);h+=Object.keys(as).sort((a,b)=>as[b].t-as[a].t).map(n=>{const kn=K(n);return `<tr class="text-xs ${FS==n?'bg-indigo-500/10':''}"><td class="px-3 py-0.5 pl-10 cursor-pointer hover:underline" title="Clique para filtrar" onclick="dash.fk('FS',${kn})">${esc(n)}</td>${ms.map(m=>td(specF(n+' · '+lab(m),r=>FOR(r)&&cat(r)==c&&nome(r)==n&&mes(r[1])==m),as[n].m[m]||0)).join('')}${td(specF(n+' · '+c,r=>FOR(r)&&cat(r)==c&&nome(r)==n&&inS(r,ms)),as[n].t)}</tr>`}).join('')}return h}).join('');
+  const pT=-af.reduce((t,r)=>t+r[5],0);
+  pr+=`<tr class="border-t-2 border-slate-400 font-bold sticky bottom-0 bg-white dark:bg-slate-900"><td class="px-3 py-2">Total</td>${ms.map(m=>`<td class="px-3 py-2 text-right">${fm(-af.filter(r=>mes(r[1])==m).reduce((t,r)=>t+r[5],0))}</td>`).join('')}<td class="px-3 py-2 text-right">${fm(pT)}</td></tr>`;
+  const cb=ag(cv,nome),sup=Object.entries(cb).map(([n,b])=>[n,b.t]).sort((a,b)=>b[1]-a[1]);
+  /* tabela de lançamentos */
+  const G={tp:r=>r[6],num:r=>r[7],prc:r=>r[8],n:r=>nome(r),v:r=>-r[5],h:r=>r[3],d:r=>r[1],c:r=>cat(r)};TBL=af.slice().sort((a,b)=>{const x=G[SK](a),y=G[SK](b);return(typeof x=='number'?x-y:String(x).localeCompare(String(y),'pt'))*SD});
+  const cols=[['tp','TIPO'],['num','TÍTULO'],['prc','PARCELA'],['n','FORNECEDOR'],['v','VALOR'],['h','HISTÓRICO'],['d','DATA DO PAGAMENTO'],['c','CATEGORIA SERVIÇO']],
+   th=cols.map(c=>`<th class="px-3 py-2 cursor-pointer select-none ${c[0]=='v'?'text-right':''}" onclick="dash.s('${c[0]}')">${c[1]} ${SK==c[0]?(SD>0?'▲':'▼'):''}</th>`).join(''),
+   tr=TBL.map((r,i)=>`<tr class="border-t border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-indigo-500/10" onclick="dash.det(${i})"><td class="px-3 py-1.5">${esc(r[6])}</td><td class="px-3 py-1.5">${esc(r[7])}</td><td class="px-3 py-1.5">${esc(r[8])}</td><td class="px-3 py-1.5">${esc(nome(r))}</td><td class="px-3 py-1.5 text-right text-rose-600 whitespace-nowrap">${fm(-r[5])}</td><td class="px-3 py-1.5">${esc(r[3])}</td><td class="px-3 py-1.5 whitespace-nowrap">${brd(r[1])}</td><td class="px-3 py-1.5">${esc(cat(r))}</td></tr>`).join('')||'<tr><td colspan="8" class="px-2 py-4 text-center text-slate-500">Nenhum lançamento para os filtros.</td></tr>';
+  $$('dres').innerHTML=`<section class="grid lg:grid-cols-2 gap-4 items-stretch"><div class="card flex flex-col"><h2 class="font-semibold mb-2">CATEGORIA TIPO <span class="text-xs font-normal text-slate-500">· ⊞ expande fornecedores · clique no nome para filtrar · clique no valor para ver lançamentos</span></h2>${tbl('<th class="px-3 py-2">CATEGORIA TIPO</th>'+ms.map(m=>`<th class="px-3 py-2 text-right">${lab(m).toUpperCase()}</th>`).join('')+'<th class="px-3 py-2 text-right">TOTAL</th>',pr,1)}</div>
+   <div class="card flex flex-col"><h2 class="font-semibold mb-2">FORNECEDORES <span class="text-xs font-normal text-slate-500">· clique numa barra para filtrar</span></h2><div style="max-height:520px;overflow-y:auto"><div style="height:${Math.max(340,sup.length*28+16)}px"><canvas id="dc6"></canvas></div></div></div></section>
+   <section class="card"><h2 class="font-semibold mb-2">LANÇAMENTOS <span class="text-xs font-normal text-slate-500">· clique no cabeçalho para ordenar · clique na linha para ver o detalhe</span></h2><div style="max-height:440px;overflow:auto"><table class="w-full text-sm whitespace-nowrap"><thead class="text-xs text-slate-500 text-left sticky top-0 bg-white dark:bg-slate-900"><tr>${th}</tr></thead><tbody>${tr}</tbody><tfoot class="sticky bottom-0 bg-white dark:bg-slate-900 font-bold"><tr class="border-t-2 border-slate-400"><td class="px-3 py-2" colspan="4">TOTAL</td><td class="px-3 py-2 text-right text-rose-600">${fm(tot)}</td><td colspan="3"></td></tr></tfoot></table></div></section>`;
+  mk('dc6',bar(sup,V,sup.length,n=>dash.fv('FS',n),FS,true,10))}
+ function render(){VIEW.style.maxWidth=tab=='for'?'1900px':'';Object.values(CH).forEach(c=>c.destroy());CH={};VIEW.innerHTML=head()+(tab=='exe'?exe():tab=='sal'?sal():forn());if(tab=='for')fres()}
+ /* ---------- janela de lançamentos (drill-through) ---------- */
+ function modal(h){let m=$$('dash-md');if(!m){m=document.createElement('div');m.id='dash-md';m.className='hidden fixed inset-0 z-[60] flex items-center justify-center p-3 bg-black/60';m.onclick=e=>{if(e.target===m)dash.cl()};document.body.appendChild(m);
+   document.addEventListener('keydown',e=>{if(e.key=='Escape')dash.cl()})}m.innerHTML=h;m.classList.remove('hidden')}
+ const dcols=['DATA','ORIGEM','TIPO','TÍTULO','PARCELA','FORNECEDOR / CLIENTE','HISTÓRICO','CATEGORIA','VALOR'];
+ function openD(t,rows){DCUR={t,rows:rows.slice().sort((a,b)=>b[1].localeCompare(a[1])||Math.abs(b[5])-Math.abs(a[5])),q:''};
+  modal(`<div class="card w-full max-w-7xl flex flex-col" style="max-height:90vh"><div class="flex flex-wrap items-center gap-2 mb-3"><div class="mr-auto"><h2 class="text-lg font-bold">${esc(t)}</h2><p id="dd-sub" class="text-xs text-slate-500"></p></div>
+   <input id="dd-q" class="inp" placeholder="🔍 Filtrar lançamentos..." oninput="dash.dq(this.value)"><button class="btn2" onclick="dash.dx()">Excel</button><button class="btn" onclick="dash.cl()">Fechar ✕</button></div>
+   <div class="overflow-auto" style="flex:1"><table class="w-full text-sm"><thead class="text-xs text-slate-500 text-left sticky top-0 bg-white dark:bg-slate-900"><tr>${dcols.map((c,i)=>`<th class="px-2 py-1.5 whitespace-nowrap ${i==8?'text-right':''}">${c}</th>`).join('')}</tr></thead><tbody id="dd-body"></tbody></table></div></div>`);fillD()}
+ function fillD(){const q=N(DCUR.q),rs=DCUR.rows.filter(r=>!q||N([nome(r),r[3],cat(r),r[6],r[7]].join(' ')).includes(q));DCUR.view=rs;
+  $$('dd-body').innerHTML=rs.map(r=>`<tr class="border-t border-slate-200 dark:border-slate-800"><td class="px-2 py-1 whitespace-nowrap">${brd(r[1])}</td><td class="px-2 py-1">${og(r)}</td><td class="px-2 py-1">${esc(r[6])}</td><td class="px-2 py-1">${esc(r[7])}</td><td class="px-2 py-1">${esc(r[8])}</td><td class="px-2 py-1">${esc(nome(r))}</td><td class="px-2 py-1">${esc(r[3])}</td><td class="px-2 py-1">${esc(cat(r))}</td><td class="px-2 py-1 text-right whitespace-nowrap${neg(sv(r))}">${fm(sv(r))}</td></tr>`).join('')||'<tr><td colspan="9" class="px-2 py-4 text-center text-slate-500">Nenhum lançamento.</td></tr>';
+  $$('dd-sub').textContent=rs.length+' lançamento(s) · total '+fr(rs.reduce((t,r)=>t+sv(r),0))+' (entradas +, saídas −)'}
+ /* ---------- leitura da planilha ---------- */
+ const iso=v=>typeof v=='number'?new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10):/^\d{2}\/\d{2}\/\d{4}/.test(String(v))?String(v).slice(0,10).split('/').reverse().join('-'):/^\d{4}-\d{2}-\d{2}/.test(String(v))?String(v).slice(0,10):'';
+ function parse(wb){const sh=k=>wb.SheetNames.find(n=>N(n).includes(k)),js=n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:'',raw:true}),sp=sh('plano'),pl={},out=[],t=x=>String(x==null?'':x).trim(),inv=[],cta=[];
+  const px={};if(sp)js(sp).forEach(r=>{const k=t(r['NATUREZA']),c=t(r['CATEGORIA']),f=t(r['CATEGORIA FLUXO DE CAIXA']);if(k)pl[k]=c;if(k&&f)px[k]=f});
+  [['R','receber'],['P','pagar']].forEach(([s,k])=>{const n=sh(k);if(n)js(n).forEach(r=>{const d=iso(r['Dt Baixa']),v=r['Total Baixado']===''?r['Valor Original']:r['Total Baixado'];if(!d||v===''||isNaN(+v))return;
+   out.push([s,d,t(r['NOME CLI/FOR']),t(r['Historico']).slice(0,120),t(r['Natureza']),Math.round(+v*100)/100,t(r['TP']),t(r['Numero']),t(r['Prc']),nc(r['Conta Banco'])])})});
+  if(!out.length)throw new Error('Não encontrei as abas "Contas a Receber (Realizado)" e "Contas a Pagar (Realizado)".');
+  const sc=sh('bancaria');if(sc)js(sc).forEach(r=>{const c=nc(r['CONTA']);if(c){const nk=Object.keys(r).find(k=>/nome|titular|apelido|descri|identific|entidade|finalidade/.test(N(k)));const ck=Object.keys(r).find(k=>/classe|tipo/.test(N(k)));cta.push({c,b:t(r['BANCO']),a:t(r['AGENCIA']),n:nk?t(r[nk]):'',k:ck?t(r[ck]):''})}});
+  const cm={};[['receber'],['pagar']].forEach(([k])=>{const n=sh(k);if(n)js(n).forEach(r=>{const c=nc(r['Conta Banco']),v=t(r['CLASSE CONTA']);if(c&&v)cm[c]=v})});cta.forEach((a,i)=>{if(!a.k)a.k=cm[a.c]||DK[i]||''});
+  if(!cta.length)[...new Set(out.map(r=>r[9]).filter(Boolean))].forEach((c,i)=>cta.push({c,b:'',a:'',n:'',k:DK[i]||''}));
+  const si=sh('investimento');if(si)js(si).forEach(r=>{const d=iso(r['Dt Baixa']),v=r['Total Baixado']===''?r['Valor Original']:r['Total Baixado'];if(!d||v===''||isNaN(+v))return;
+   const nt=t(r['Natureza']),h=t(r['Historico']),tp=N(r['TIPO']),kd=nt=='9.0102'?'ap':nt=='9.0101'?'rs':nt=='1.0301'?'rd':nt=='2.9905'?'ir':tp=='entrada'?'ap':'rs',cn=t(r['Conta Banco']),H=N(h),
+    pc={'130105650':'CDB','1301056500':'COMPROMISSADA','013010565':'CONTAMAX'}[cn]||'',pr=/compr/.test(H)?'COMPROMISSADA':/cdb/.test(H)?'CDB':/contamax|automatico/.test(H)?'CONTAMAX':pc||'CONTAMAX';
+   inv.push([kd=='ap'||kd=='rd'?'R':'P',d,pr,h.slice(0,120),nt,Math.round(+v*100)/100,'INV','','',cn,{ap:'Aplicação',rs:'Resgate',rd:'Rendimento',ir:'IR sobre resgate'}[kd],kd,pc])});
+  return{r:out,p:Object.keys(pl).length?pl:PL,x:Object.keys(px).length?px:PX,i:inv,c:cta}}
+
+ const URLP='dados/dashboard/BASE_FLUXO_DE_CAIXA_REALIZADO.xlsx';
+ function ing(buf,orig){try{const x=parse(XLSX.read(buf,{type:'array'}));RA=x.r;PL=x.p;PX=x.x;IV0=x.i;CTA=x.c;CT=CTA[0]?CTA[0].c:'';flt();if(tab=='sal'){CTP=CT;CT='';flt()}lastPer();FC='';FS='';FQ='';
+   const sem=R.filter(r=>!PL[r[4]]).length;MSG=RA.length+' lançamentos + '+IV0.length+' de investimento carregados de '+orig+' (base até '+brd(maxD())+', conta '+(CT||'todas')+')'+(sem?' · '+sem+' sem natureza no Plano de Naturezas':'')+'.';
+   try{localStorage.setItem(KEY,JSON.stringify(x))}catch(e){MSG+=' (não foi possível guardar neste navegador)'}}catch(e){MSG='Erro ao ler a planilha: '+e.message}render()}
+ const refresh=()=>{if(tab=='for'){const e=$$('dfc');if(e)e.value=FC;fres()}else render()};
+ CT=CTA[0]?CTA[0].c:'';CTP=CT;flt();lastPer();
+ window.dash={show(){render()},t(x){if(x=='sal'&&tab!='sal'){CTP=CT;CT='';flt()}else if(x!='sal'&&tab=='sal'){CT=CTP;flt()}MT[tab]=M;M=x in MT?MT[x]:(tab=x,dM());tab=x;render()},
+  go(c){CT=c;CTP=c;tab='exe';flt();render()},
+  f(k,v){if(k=='Y'){Y=v;M=''}else if(k=='CT'){CT=v;CTP=v;flt();FC='';FS=''}else if(k=='M')M=(v==M?'':v);render()},
+  fv(k,v,set){if(k=='FC')FC=set?v:(FC==v?'':v);else FS=set?v:(FS==v?'':v);refresh()},fk(k,i){this.fv(k,KEYS[i])},
+  rm(k){if(k=='M'){M='';render();return}if(k=='FC')FC='';else if(k=='FS')FS='';else{FQ='';const e=$$('dq');if(e)e.value=''}refresh()},
+  clr(){FC='';FS='';FQ='';lastPer();render()},q(v){FQ=v;fres()},ok(i){OPEN[KEYS[i]]=!OPEN[KEYS[i]];fres()},x(k){EX[k]=!EX[k];render()},xa(v){SKS.concat(CTA.map(a=>'a_'+a.c)).forEach(k=>EX[k]=v);if(v)CTA.forEach(a=>['ent','sai','inv','tr','iv'].forEach(g=>EX['a_'+a.c+'_'+g]=true));else Object.keys(EX).filter(k=>k.startsWith('a_')).forEach(k=>EX[k]=false);render()},
+  s(k){if(SK==k)SD=-SD;else{SK=k;SD=1}fres()},
+  dr(i){const sp=DRL[i];if(sp)openD(sp.t,src(sp.s).filter(sp.f))},o2(t,f,s){openD(t,src(s).filter(f))},
+  o3(t){const ms=scope().map(x=>x.m),q=r=>!FQ||N(nome(r)+' '+r[3]).includes(N(FQ));openD(t,R.filter(r=>FOR(r)&&inS(r,ms)&&q(r)&&(!FC||cat(r)==FC)&&(!FS||nome(r)==FS)))},
+  det(i){const r=TBL[i];if(!r)return;const L=[['Tipo',r[6]],['Título',r[7]],['Parcela',r[8]],['Fornecedor / Cliente',nome(r)],['Valor',fr(sv(r))],['Data do pagamento',brd(r[1])],['Natureza',r[4]],['Categoria serviço',cat(r)],['Histórico',r[3]]];
+   modal(`<div class="card w-full max-w-lg"><h2 class="text-lg font-bold mb-3">Detalhe do lançamento</h2><dl class="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">${L.map(x=>`<dt class="text-slate-500 text-xs uppercase pt-0.5">${x[0]}</dt><dd class="col-span-2 break-words">${esc(x[1])||'—'}</dd>`).join('')}</dl><div class="flex justify-end mt-4"><button class="btn" onclick="dash.cl()">Fechar</button></div></div>`)},
+  cl(){const m=$$('dash-md');if(m)m.classList.add('hidden')},dq(v){if(DCUR){DCUR.q=v;fillD()}},
+  dx(){if(!DCUR)return;const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet((DCUR.view||DCUR.rows).map(r=>({DATA:brd(r[1]),ORIGEM:og(r),TIPO:r[6],'TÍTULO':r[7],PARCELA:r[8],'FORNECEDOR / CLIENTE':nome(r),'HISTÓRICO':r[3],CATEGORIA:cat(r),VALOR:sv(r)}))),'Lançamentos');saveAs('lancamentos_fluxo_caixa.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))},
+  up(i){if(ROLE!='admin'){i.value='';return}const fl=i.files[0];i.value='';if(!fl)return;const rd=new FileReader();rd.onload=()=>ing(rd.result,fl.name);rd.readAsArrayBuffer(fl)},
+  pasta(){if(ROLE!='admin')return;MSG='Importando '+URLP+' …';render();
+   fetch(URLP+'?v='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('arquivo não encontrado em '+URLP+' (HTTP '+r.status+')');return r.arrayBuffer()}).then(b=>ing(b,URLP))
+    .catch(e=>{MSG='Não consegui importar da pasta: '+e.message+'. Funciona no site publicado (GitHub Pages) com a planilha em '+URLP+'.';render()})},
+  xl(){const s=scope(),wb=XLSX.utils.book_new(),ms=s.map(x=>x.m);XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s.map(x=>({'Mês/Ano':lab(x.m),'Saldo Inicial':x.si,'Entradas':x.ent,'Saídas':-x.sai,'Investimento (posição)':x.inv,'Saldo Final':x.sf}))),'Resumo');
+   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(R.filter(r=>inS(r,ms)).map(r=>({Data:brd(r[1]),Origem:og(r),Tipo:r[6],'Título':r[7],Parcela:r[8],Fornecedor_Cliente:nome(r),Histórico:r[3],Categoria:cat(r),Classe:{ent:'Entrada',sai:'Saída',inv:'Investimento',tr:'Transferência'}[cls(r)],Valor:r[5]}))),'Lançamentos');
+   if(IV.length){const S=ivSerie(),rw=[];PR.concat(['TOTAL']).forEach(p=>S[p].filter(b=>ms.includes(b.m)).forEach(b=>rw.push({Produto:p,'Mês/Ano':lab(b.m),'Saldo inicial':b.si,'Aplicações':b.ap,'Resgates':-b.rs,'Rendimentos':b.rd,'IR sobre resgate':-b.ir,'Saldo final':b.sf})));
+   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rw),'Saldos');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(IV.filter(r=>inS(r,ms)).map(r=>({Data:brd(r[1]),Produto:r[2],Tipo:r[10],Histórico:r[3],Natureza:r[4],'Conta Banco':r[9],Valor:sv(r)}))),'Investimentos')}
+   saveAs('dashboard_fluxo_caixa.xlsx',XLSX.write(wb,{bookType:'xlsx',type:'array'}))},calc:{serie,kpis:()=>kpis(),posInv,ivSerie,confer,posAt,setCT:v=>{CT=v;flt()},rows:()=>R,iv:()=>IV}};
+})();
+
+</script>
+<script>
+/* Menu lateral (MODS), tema, login e inicialização — carregado por último */
+/* ---------- Menu lateral: para novos módulos, adicione um item em MODS e um <main data-view="id"> ---------- */
+const MODS=[{id:'fundo',nome:'Fundo de Reserva',ic:'💰'},{id:'reidi',nome:'REIDI',ic:'🏗️'},{id:'fluxo',nome:'Fluxo de Caixa',ic:'📊'},{id:'dash',nome:'Dashboard',ic:'📈'},{id:'boletim',nome:'Boletim de Caixa',ic:'🧾'},{id:'usuarios',nome:'Usuários',ic:'👥',adm:true}]; // adm:true → só administrador
+function sb(o){$('#sb').classList.toggle('-translate-x-full',!o);$('#bd').classList.toggle('hidden',!o)}
+function go(id){if((MODS.find(m=>m.id==id)||{}).adm&&ROLE!='admin')id='fundo';document.querySelectorAll('[data-view]').forEach(v=>v.classList.toggle('hidden',v.dataset.view!=id));
+ $('#nav').innerHTML=MODS.filter(m=>!m.adm||ROLE=='admin').map(m=>`<button onclick="go('${m.id}')" class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left ${m.id==id?'bg-indigo-600 text-white':'hover:bg-slate-100 dark:hover:bg-slate-800'}"><span>${m.ic}</span>${m.nome}</button>`).join('');
+ $('#pt2').textContent=(MODS.find(m=>m.id==id)||{}).nome||'';if(id=='usuarios')uRender();if(id=='dash'&&window.dash)dash.show();sb(0)}
+/* ---------- Tema e login ---------- */
+function setTheme(dk){document.documentElement.classList.toggle('dark',dk);try{localStorage.th=dk?1:0}catch(e){}
+ Chart.defaults.color=dk?'#94a3b8':'#475569';Chart.defaults.borderColor=dk?'#1e293b':'#e2e8f0';if(D.length&&!$('#app').classList.contains('hidden'))render()}
+function showLogin(t){$('#app').classList.add('hidden');$('#lg').classList.remove('hidden');if(t){const e=$('#err');e.textContent=t;e.classList.remove('hidden')}}
+function start(){$('#who').textContent=ME+' ('+(ROLE=='admin'?'administrador':'visualizador')+')';document.body.classList.toggle('viewer',ROLE!='admin');
+ $('#lg').classList.add('hidden');$('#app').classList.remove('hidden');go('fundo');idle();if(!D.length)seed();else render()}
+/* Carrega o perfil (public.perfis) da sessão atual; só entra quem existe e está ativo */
+async function enter(uid){const{data:{session}}=await sb_.auth.getSession();if(!session)return showLogin();
+ const r=await sb_.from('perfis').select('*').eq('id',uid||session.user.id).maybeSingle(),p=r.data;
+ if(r.error||!p||!p.ativo){await sb_.auth.signOut();return showLogin(r.error?'Falha ao carregar o perfil.':!p?'Usuário sem perfil. Fale com o administrador.':'Usuário desativado. Fale com o administrador.')}
+ PF={...p,email:session.user.email};ME=p.login;ROLE=p.papel;
+ if(p.mc){$('#lg').classList.add('hidden');$('#app').classList.remove('hidden');pwModal(1);return}
+ start()}
+let FAIL={n:0,until:0};
+async function login(){const l=$('#u').value.trim().toLowerCase(),e=$('#err'),now=Date.now(),bad=t=>{e.textContent=t;e.classList.remove('hidden')};
+ if(!SB_OK)return bad('Supabase não configurado: informe a chave pública em js/core/config.js.');
+ if(FAIL.until>now)return bad('Muitas tentativas. Aguarde '+Math.ceil((FAIL.until-now)/1000)+'s.');
+ if(!l||!$('#pw').value)return bad('Informe usuário e senha.');
+ const r=await sb_.auth.signInWithPassword({email:emailDe(l),password:$('#pw').value});$('#pw').value='';
+ if(r.error){FAIL.n++;if(FAIL.n>=5){FAIL={n:0,until:now+60000};return bad('Muitas tentativas. Aguarde 60 s.')}return bad(r.error.status==429?'Muitas tentativas. Tente mais tarde.':'Usuário ou senha inválidos.')}
+ FAIL={n:0,until:0};e.classList.add('hidden');await enter(r.data.user.id);if(PF)uLog('login')}
+let _t;function idle(){clearTimeout(_t);_t=setTimeout(()=>{uLog('sessão expirada');logout()},IDLE)}
+['click','keydown','touchstart'].forEach(ev=>addEventListener(ev,()=>{if(!$('#app').classList.contains('hidden'))idle()},{passive:true}));
+async function logout(){try{if(PF)await uLog('logout');await sb_.auth.signOut()}catch(e){}location.reload()}
+function seed(){setData([norm({d:'2026-09-30',ded:4864267,base:7296400.52,aliq:.05,iss:364820.03,inss:468185.69,bruto:12160667.52,ret:833005.72,liq:11327661.8,adi:2432183.5})])}
+let dk=true;try{dk=localStorage.th!=='0'}catch(e){}setTheme(dk);
+if(SB_OK){sb_.auth.onAuthStateChange(ev=>{if(ev=='SIGNED_OUT'&&PF){PF=null;showLogin('Sessão encerrada.')}});enter()}else showLogin('Supabase não configurado: informe a chave pública em js/core/config.js.');
+
+</script>
+
+</body>
+</html>
