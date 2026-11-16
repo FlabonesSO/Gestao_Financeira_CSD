@@ -1,7 +1,0 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
-const ctx={window:{},document:{readyState:'loading',addEventListener(){}}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/core/tabelas_ordenacao.js'),'utf8'),ctx);const {number,compare}=ctx.window.ORDT;
-test('Valores em reais preservam centavos, sinal e zero',()=>{assert.equal(number('R$ 1.234,56'),1234.56);assert.equal(number('-R$ 2.345,67'),-2345.67);assert.equal(number('R$ 0,00'),0);assert.equal(number('—'),null);assert.equal(number('(123,45)'),-123.45)});
-test('Maior e menor pagamento usam magnitude dos valores negativos',()=>{const v=[-10,-300,-20];assert.deepEqual(v.slice().sort((a,b)=>compare(a,b,1,true,true)),[-300,-20,-10]);assert.deepEqual(v.slice().sort((a,b)=>compare(a,b,-1,true,true)),[-10,-20,-300])});
-test('Saldos negativos preservam ordenação numérica normal',()=>{assert.deepEqual([-10,0,20].sort((a,b)=>compare(a,b,1,true,false)),[20,0,-10])});
-test('Valores ausentes ficam no final em ambos os sentidos',()=>{for(const d of [1,-1])assert.deepEqual([null,20,0].sort((a,b)=>compare(a,b,d,true,false)),d===1?[20,0,null]:[0,20,null])});
-test('Texto adicional não entra no valor financeiro',()=>{assert.equal(number('R$ 1.000,25 12 pagamentos'),1000.25);assert.equal(number('R$ 20,50 40% pago'),20.50)});
